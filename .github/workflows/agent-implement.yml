@@ -1,0 +1,87 @@
+name: Agent implement (Paseo)
+
+run-name: "Agent implement: issue #${{ inputs.issue }}"
+
+# Spawns a detached Paseo agent session on the self-hosted Mac runner to
+# implement one issue. Dispatched by unblock-dispatch.yml; can also be run
+# manually from the Actions tab for any issue number.
+# See docs/agents/auto-dispatch.md for the runner + Paseo setup.
+
+on:
+  workflow_dispatch:
+    inputs:
+      issue:
+        description: "Issue number to implement"
+        required: true
+        type: string
+
+permissions: {}
+
+jobs:
+  spawn:
+    runs-on: [self-hosted, macOS]
+    timeout-minutes: 15
+    steps:
+      - name: Spawn detached Paseo session
+        env:
+          ISSUE: ${{ inputs.issue }}
+          PROJECT_DIR: ${{ vars.PASEO_PROJECT_DIR }}
+          # Optional repo Actions variables; the defaults below apply when unset.
+          PASEO_MODEL: ${{ vars.PASEO_MODEL }}
+          PASEO_THINKING: ${{ vars.PASEO_THINKING }}
+          PASEO_MODE: ${{ vars.PASEO_MODE }}
+        run: |
+          set -euo pipefail
+          # Runner services start with a minimal PATH; include the usual
+          # CLI install locations.
+          export PATH="$PATH:/opt/homebrew/bin:/usr/local/bin:$HOME/.local/bin"
+          command -v paseo >/dev/null || { echo "::error::paseo CLI not found on the runner's PATH" >&2; exit 1; }
+          if [ -z "${PROJECT_DIR:-}" ]; then
+            echo "::error::Set the PASEO_PROJECT_DIR repository Actions variable to this repo's checkout path on this Mac" >&2
+            exit 1
+          fi
+
+          # Pinned rather than left to the Paseo daemon's defaults, which move
+          # as new models ship. Override per-repo with the PASEO_MODEL /
+          # PASEO_THINKING Actions variables.
+          export MODEL="${PASEO_MODEL:-claude-opus-5}"
+          export THINKING="${PASEO_THINKING:-high}"
+
+          # Nobody is around to answer a permission prompt in a detached CI
+          # session, so the default mode ("Always Ask") would just stall until
+          # the daemon times it out. Bypass instead. Unlike --model/--thinking,
+          # `paseo run` rejects an unknown --mode outright, so this needs no
+          # validation below.
+          MODE="${PASEO_MODE:-bypassPermissions}"
+
+          # `paseo run` accepts an unknown --model/--thinking without complaint
+          # and spawns the session anyway, so a typo'd variable would silently
+          # run on the wrong model. Check both against the provider first.
+          paseo provider models claude --json | python3 -c '
+          import json, os, sys
+          models = json.load(sys.stdin)
+          model, thinking = os.environ["MODEL"], os.environ["THINKING"]
+          match = next((m for m in models if m["id"] == model), None)
+          if match is None:
+              sys.exit("::error::PASEO_MODEL %r is not a Claude model id. Available: %s"
+                       % (model, ", ".join(m["id"] for m in models)))
+          options = match.get("thinkingOptionIds") or []
+          if thinking not in options:
+              sys.exit("::error::PASEO_THINKING %r is not valid for %s. Available: %s"
+                       % (thinking, model, ", ".join(options)))
+          '
+          echo "Spawning session for issue #${ISSUE} on ${MODEL} at ${THINKING} reasoning effort in ${MODE} mode"
+
+          # --detach: the session runs under the Paseo daemon, so it outlives
+          # this job; progress is visible in the Paseo apps. The prompt invokes
+          # the /implement skill, which carries the full workflow instructions —
+          # this template does not ship it yet, so add `.claude/skills/implement/`
+          # before the first dispatch (see docs/agents/auto-dispatch.md).
+          paseo run --detach \
+            --provider claude \
+            --model "$MODEL" \
+            --thinking "$THINKING" \
+            --mode "$MODE" \
+            --cwd "$PROJECT_DIR" \
+            --worktree "claude/issue-${ISSUE}" \
+            "/implement issue #${ISSUE}"
