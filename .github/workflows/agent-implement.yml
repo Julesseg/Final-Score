@@ -1,5 +1,8 @@
 name: Agent implement (Paseo)
 
+# Load-bearing: unblock-dispatch.yml reads the issue number back out of this
+# run name to tell which issues already have a session on the way. Keep the
+# "issue #<N>" shape.
 run-name: "Agent implement: issue #${{ inputs.issue }}"
 
 # Spawns a detached Paseo agent session on the self-hosted Mac runner to
@@ -14,15 +17,59 @@ on:
         description: "Issue number to implement"
         required: true
         type: string
+      force:
+        description: "Spawn even if the issue is closed or already claimed"
+        required: false
+        default: false
+        type: boolean
 
-permissions: {}
+permissions:
+  issues: read
 
 jobs:
   spawn:
     runs-on: [self-hosted, macOS]
     timeout-minutes: 15
     steps:
+      # This job can sit queued for up to 24 h waiting for the Mac to wake, so
+      # what was true when the dispatcher fired it may not be true now: the
+      # issue may have been finished by hand in the meantime, or a duplicate
+      # run that beat this one to the runner may already have a session on it.
+      # Re-check at the moment of spawning rather than trusting the intent.
+      - name: Re-check the issue
+        id: preflight
+        uses: actions/github-script@v7
+        # Through the environment rather than `${{ }}` inside the script, so a
+        # hand-typed input is data and never JavaScript.
+        env:
+          ISSUE: ${{ inputs.issue }}
+          FORCE: ${{ inputs.force }}
+        with:
+          script: |
+            const number = Number(process.env.ISSUE);
+            const { data: issue } = await github.rest.issues.get({
+              ...context.repo, issue_number: number,
+            });
+
+            let stale = null;
+            if (issue.state === 'closed') {
+              stale = `#${number} is already closed ("${issue.state_reason}")`;
+            } else if (issue.labels.some(l => l.name === 'agent-dispatched')) {
+              // A session applies that label as its first act, so it means one
+              // is already on this issue — see docs/agents/auto-dispatch.md.
+              stale = `#${number} is already claimed by a running session`;
+            }
+
+            if (!stale) return;
+            if (process.env.FORCE === 'true') {
+              core.warning(`${stale}; spawning anyway because force was set.`);
+              return;
+            }
+            core.setOutput('skip', 'true');
+            core.notice(`Not spawning: ${stale}. Re-run with force to override.`);
+
       - name: Spawn detached Paseo session
+        if: steps.preflight.outputs.skip != 'true'
         env:
           ISSUE: ${{ inputs.issue }}
           PROJECT_DIR: ${{ vars.PASEO_PROJECT_DIR }}
@@ -30,6 +77,7 @@ jobs:
           PASEO_MODEL: ${{ vars.PASEO_MODEL }}
           PASEO_THINKING: ${{ vars.PASEO_THINKING }}
           PASEO_MODE: ${{ vars.PASEO_MODE }}
+          PASEO_BASE: ${{ vars.PASEO_BASE }}
         run: |
           set -euo pipefail
           # Runner services start with a minimal PATH; include the usual
@@ -54,6 +102,12 @@ jobs:
           # validation below.
           MODE="${PASEO_MODE:-bypassPermissions}"
 
+          # The remote tip, not the Mac clone's checked-out branch: nothing
+          # updates that clone, so its local `main` drifts arbitrarily far
+          # behind while the runner sits idle, and a session branched off it
+          # starts by reading stale code.
+          BASE="${PASEO_BASE:-origin/main}"
+
           # `paseo run` accepts an unknown --model/--thinking without complaint
           # and spawns the session anyway, so a typo'd variable would silently
           # run on the wrong model. Check both against the provider first.
@@ -70,18 +124,31 @@ jobs:
               sys.exit("::error::PASEO_THINKING %r is not valid for %s. Available: %s"
                        % (thinking, model, ", ".join(options)))
           '
-          echo "Spawning session for issue #${ISSUE} on ${MODEL} at ${THINKING} reasoning effort in ${MODE} mode"
+          # Paseo resolves --base against the clone's own refs and never
+          # fetches, so `origin/main` there is only as current as whoever last
+          # ran a fetch by hand. Refresh first or the default base is a
+          # remote-tracking ref pointing at yesterday.
+          git -C "$PROJECT_DIR" fetch --prune origin
+
+          echo "Spawning session for issue #${ISSUE} on ${MODEL} at ${THINKING} reasoning effort in ${MODE} mode, branched off ${BASE}"
 
           # --detach: the session runs under the Paseo daemon, so it outlives
           # this job; progress is visible in the Paseo apps. The prompt invokes
-          # the /implement skill, which carries the full workflow instructions —
-          # this template does not ship it yet, so add `.claude/skills/implement/`
-          # before the first dispatch (see docs/agents/auto-dispatch.md).
+          # the /label-and-implement-with-pr skill, which carries the full
+          # workflow instructions — starting with claiming the issue with the
+          # `agent-dispatched` label, which nothing else applies, and ending
+          # with a pull request (see docs/agents/auto-dispatch.md).
+          # Unlike --model/--thinking, an unresolvable --base fails the run
+          # outright instead of spawning on the wrong commit, so it needs no
+          # validation of its own.
           paseo run --detach \
             --provider claude \
             --model "$MODEL" \
             --thinking "$THINKING" \
             --mode "$MODE" \
             --cwd "$PROJECT_DIR" \
-            --worktree "claude/issue-${ISSUE}" \
-            "/implement issue #${ISSUE}"
+            --new-workspace worktree \
+            --worktree-mode branch-off \
+            --new-branch "claude/issue-${ISSUE}" \
+            --base "$BASE" \
+            "/label-and-implement-with-pr issue #${ISSUE}"

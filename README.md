@@ -22,11 +22,11 @@ identity (`FinalScore` / `com.julesseguin.final-score`) that one script swaps fo
   automatic signing, so there are no provisioning-profile secrets to manage.
   Shares the signing certificate with the PR-build pipeline (see below).
 - **Auto-dispatched agent sessions** (`.github/workflows/unblock-dispatch.yml`
-  + `agent-implement.yml`) — when a merged PR closes an issue, `ready-for-agent`
-  issues whose `## Blocked by` list is now fully closed each get a detached
-  [Paseo](https://paseo.sh) Claude Code session spawned on a self-hosted Mac
-  runner to implement them. Dormant until you set up the runner (see below) —
-  PR and issue events stay green meanwhile.
+  + `agent-implement.yml`) — `ready-for-agent` issues that nothing blocks each
+  get a detached [Paseo](https://paseo.sh) Claude Code session spawned on a
+  self-hosted Mac runner to implement them, re-scanned whenever a merged PR
+  closes an issue or you kick the workflow off by hand. Dormant until you set
+  up the runner (see below) — PR and issue events stay green meanwhile.
 - **Claude Code setup** (`.claude/`) — Conventional Commits enforced by a
   PreToolUse hook, a SessionStart hook that installs a Swift toolchain in web
   containers so `swift test` works there, and per-environment guidance about
@@ -61,7 +61,7 @@ App/<Name>UITests/    XCUITest acceptance suite (runs in CI on every PR)
                       + unblock-dispatch.yml / agent-implement.yml (agent auto-dispatch)
 ci/                   assemble-build-history.mjs + pipeline docs (ci/README.md)
 docs/agents/          auto-dispatch setup (self-hosted runner + Paseo)
-.claude/              Claude Code hooks & settings
+.claude/              Claude Code hooks, settings & the mirrored skill set
 scripts/rename.sh     placeholder → your identity
 ```
 
@@ -211,17 +211,20 @@ attached to the run as an artifact (7-day retention). A misformatted tag (not
 ## Enabling agent auto-dispatch (one-time)
 
 The auto-dispatch pipeline (`unblock-dispatch.yml` + `agent-implement.yml`)
-spawns a detached [Paseo](https://paseo.sh) Claude Code session per newly
-unblocked issue. Until you complete this setup, `unblock-dispatch.yml` runs on
-issue-close events but finds nothing to dispatch, and `agent-implement.yml`
-never runs — both stay green.
+spawns a detached [Paseo](https://paseo.sh) Claude Code session per ready
+issue. Until you complete this setup, `unblock-dispatch.yml` runs on issue
+events but finds nothing to dispatch, and `agent-implement.yml` never runs —
+both stay green.
 
 1. **Create the `ready-for-agent` label** and write blockers as `- #N` bullets
    under a `## Blocked by` heading in issue bodies — that's what the dispatcher
-   scans for.
-2. **Add an `/implement` skill** at `.claude/skills/implement/` — the dispatch
-   prompt is just `/implement issue #<N>`, so the skill is what tells the
-   session how to work. Not shipped with this template.
+   scans for. An issue with no blockers qualifies too, and starts on the next
+   issue close or a manual run of `unblock-dispatch.yml`.
+2. **Keep the `/label-and-implement-with-pr` skill** at
+   `.claude/skills/label-and-implement-with-pr/` — the dispatch prompt is
+   just `/label-and-implement-with-pr issue #<N>`, so the skill is what tells
+   the session how to work: claim the issue, call `/implement`, open the PR.
+   Shipped in this repo, mirrored from the maintainer's personal skill set.
 3. **Register a self-hosted macOS runner** (repo → Settings → Actions →
    Runners) on a Mac with the Paseo daemon running and `gh` + `claude` logged
    in.
@@ -232,8 +235,13 @@ never runs — both stay green.
    | --- | --- |
    | `PASEO_PROJECT_DIR` | Absolute path of this repo's clone on the runner Mac; agent sessions spawn git worktrees off it |
 
-   Three more are optional: `PASEO_MODEL`, `PASEO_THINKING`, and `PASEO_MODE`
-   override the pinned defaults (Opus 5, high effort, bypass mode).
+   The clone needs to be able to `git fetch origin` unattended as the runner's
+   user — the spawn step refreshes it so each session branches off the current
+   `origin/main` rather than the clone's own stale `main`.
+
+   Four more are optional: `PASEO_MODEL`, `PASEO_THINKING`, `PASEO_MODE`, and
+   `PASEO_BASE` override the pinned defaults (Opus 5, high effort, bypass mode,
+   `origin/main`).
 
 Full walkthrough, scope rules, the in-flight cap, and the optional variables:
 [`docs/agents/auto-dispatch.md`](docs/agents/auto-dispatch.md).
@@ -263,6 +271,14 @@ Full walkthrough, scope rules, the in-flight cap, and the optional variables:
 - **`platform-guidance.sh`** (SessionStart) — tells the agent whether this
   machine can run the XCUITest suite (a Mac with Xcode can; a Linux container
   cannot — CI is the gate there).
+
+`.claude/skills/` mirrors the maintainer's personal skill set, so a dispatched
+agent session finds `/label-and-implement-with-pr` (and the `/implement` skill
+it calls) in any clone, on any machine, without depending on how that machine's
+Claude config happens to be set up. The personal copies under `~/.claude/skills/`
+are the source of truth — re-copy here when they change. The `paseo*` skills are
+deliberately left out: the Paseo app installs and updates those itself, so a
+committed copy would go stale unnoticed.
 
 `AGENTS.md` carries the matching conventions (commit/PR-title format, "always
 implement the UI, let CI verify it"). Customize both for your project.
