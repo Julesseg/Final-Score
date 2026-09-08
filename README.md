@@ -132,7 +132,7 @@ and profile at runtime — nothing else to copy.
    the gate (a ~1-second failure, no steps run). Fix at *Settings →
    Environments → github-pages → Deployment branches and tags*: choose **No
    restriction**, or keep *Selected branches* and add a rule matching your PR
-   branch names (e.g. `claude/*`).
+   branch names (e.g. `agent/*`).
 
 The `build-history` branch appears automatically on the first successful
 publish. It's a derived store — force-pushed every run so multi-MB `.ipa`

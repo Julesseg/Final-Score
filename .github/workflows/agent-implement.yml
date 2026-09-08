@@ -149,6 +149,6 @@ jobs:
             --cwd "$PROJECT_DIR" \
             --new-workspace worktree \
             --worktree-mode branch-off \
-            --new-branch "claude/issue-${ISSUE}" \
+            --new-branch "agent/issue-${ISSUE}" \
             --base "$BASE" \
             "/label-and-implement-with-pr issue #${ISSUE}"

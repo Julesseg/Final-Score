@@ -18,7 +18,7 @@ Two workflows split detection from execution:
    issue number and comments on the issue.
 2. **`agent-implement.yml`** (self-hosted Mac runner) re-checks the issue, then
    fetches the Mac clone's remotes and runs `paseo run --detach --new-branch
-   claude/issue-<N> --base origin/main … "/label-and-implement-with-pr issue #<N>"`.
+   agent/issue-<N> --base origin/main … "/label-and-implement-with-pr issue #<N>"`.
    The `/label-and-implement-with-pr` skill carries the workflow instructions —
    claim the issue with the `agent-dispatched` label, run `/implement` to build
    it per AGENTS.md, then merge the base branch in, push, and open a PR that
