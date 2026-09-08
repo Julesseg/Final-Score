@@ -1,5 +1,5 @@
 import SwiftUI
-import MyAppCore
+import FinalScoreCore
 
 struct ContentView: View {
     var body: some View {
