@@ -11,6 +11,18 @@ issues whose `## Blocked by` list is now fully closed and spawns a Paseo agent
 session for each on the self-hosted Mac runner (capped, guarded by the
 `agent-dispatched` label). See `docs/agents/auto-dispatch.md`.
 
+### Issue tracker
+
+Issues live in GitHub Issues on this repo, driven through the `gh` CLI. See `docs/agents/issue-tracker.md`.
+
+### Triage labels
+
+The five default labels: `needs-triage`, `needs-info`, `ready-for-agent`, `ready-for-human`, `wontfix`. See `docs/agents/triage-labels.md`.
+
+### Domain docs
+
+Single-context: one root `CONTEXT.md` plus `docs/adr/`, both created lazily. See `docs/agents/domain.md`.
+
 ## Conventions
 
 ### Conventional Commits — commit subjects *and* PR titles
