@@ -40,14 +40,18 @@ public struct Round: Codable, Hashable, Identifiable, Sendable {
 /// so later edits to that Game never reach it.
 public struct Match: Codable, Hashable, Identifiable, Sendable {
     public let id: UUID
+    /// When setup finished and the scorepad opened. What "newest" means when
+    /// Matches are listed.
+    public let startedAt: Date
     public let game: Game
     /// Composed at setup and fixed for the whole Match.
     public let teams: [Team]
     public private(set) var rounds: [Round]
 
     /// A new Match opens on an empty first Round, ready to score.
-    public init(id: UUID = UUID(), game: Game, teams: [Team]) {
+    public init(id: UUID = UUID(), startedAt: Date = Date(), game: Game, teams: [Team]) {
         self.id = id
+        self.startedAt = startedAt
         self.game = game
         self.teams = teams
         self.rounds = [Round()]

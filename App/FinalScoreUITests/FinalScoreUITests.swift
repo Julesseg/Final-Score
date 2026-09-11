@@ -33,7 +33,7 @@ final class FinalScoreUITests: XCTestCase {
         startSkyjoMatch(players: ["Ada", "Grace"])
         press("7", "next", "next")
 
-        app.navigationBars.buttons.element(boundBy: 0).tap()
+        backToList()
 
         let row = app.buttons["matchRow"]
         XCTAssertTrue(row.waitForExistence(timeout: 5))
@@ -45,6 +45,36 @@ final class FinalScoreUITests: XCTestCase {
         XCTAssertEqual(total(0), "7")
         XCTAssertEqual(total(1), "0", "Next on an untouched Score records an explicit 0")
         XCTAssertEqual(app.buttons["score.1.1"].value as? String, "0")
+    }
+
+    func testEveryMatchComesBackAfterAKillNewestFirst() throws {
+        launch()
+        startSkyjoMatch(players: ["Ada", "Grace"])
+        // Round 1 in full, then Round 2 left half scored: Ada has 8, Grace hasn't played.
+        press("1", "2", "next", "5", "next", "8")
+        backToList()
+        startSkyjoMatch(players: ["Linus", "Marie"])
+        press("4")
+        backToList()
+
+        app.terminate()
+        app.launch()
+
+        let rows = app.buttons.matching(identifier: "matchRow")
+        XCTAssertTrue(rows.element(boundBy: 1).waitForExistence(timeout: 10), "Both Matches should survive the kill")
+        XCTAssertEqual(rows.count, 2)
+        XCTAssertTrue(rows.element(boundBy: 0).label.contains("Linus"), "The Match started last is listed first")
+        XCTAssertTrue(rows.element(boundBy: 1).label.contains("Ada"))
+
+        rows.element(boundBy: 1).tap()
+
+        XCTAssertTrue(app.staticTexts["total.0"].waitForExistence(timeout: 5))
+        XCTAssertEqual(app.buttons["score.1.0"].value as? String, "12")
+        XCTAssertEqual(app.buttons["score.2.0"].value as? String, "8")
+        XCTAssertEqual(app.buttons["score.2.1"].value as? String, "Not scored", "Round 2 is still half scored")
+        XCTAssertEqual(total(0), "20")
+        XCTAssertEqual(total(1), "5")
+        XCTAssertTrue(app.staticTexts["partialTotalsNotice"].exists)
     }
 
     func testScoringWorksInLandscape() throws {
@@ -64,6 +94,9 @@ final class FinalScoreUITests: XCTestCase {
     private func launch(in orientation: UIDeviceOrientation = .portrait) {
         continueAfterFailure = false
         XCUIDevice.shared.orientation = orientation
+        // Matches are saved to disk now, so each test gets a folder of its own
+        // and starts on an empty list. Relaunching keeps the same folder.
+        app.launchEnvironment["MATCHES_FOLDER"] = "UITests-\(UUID().uuidString)"
         app.launch()
     }
 
@@ -88,6 +121,10 @@ final class FinalScoreUITests: XCTestCase {
 
         app.buttons["startMatchButton"].tap()
         XCTAssertTrue(app.buttons["key.next"].waitForExistence(timeout: 5))
+    }
+
+    private func backToList() {
+        app.navigationBars.buttons.element(boundBy: 0).tap()
     }
 
     private func press(_ keys: String...) {

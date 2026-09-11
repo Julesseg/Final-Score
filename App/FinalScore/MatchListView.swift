@@ -35,13 +35,13 @@ struct MatchListView: View {
                 if let match = library.match(id: id) {
                     ScorepadView(match: Binding(
                         get: { library.match(id: id) ?? match },
-                        set: { library.update($0) }
+                        set: { library.save($0) }
                     ))
                 }
             }
             .sheet(isPresented: $isSettingUp) {
                 NewMatchView { match in
-                    library.add(match)
+                    library.save(match)
                     isSettingUp = false
                     path = [match.id]
                 }
