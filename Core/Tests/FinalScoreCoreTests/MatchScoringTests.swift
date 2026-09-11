@@ -77,15 +77,17 @@ struct MatchScoringTests {
         #expect(!match.totalsArePartial)
     }
 
-    @Test func anEarlierRoundLeftPartlyFilledKeepsTotalsPartial() {
+    @Test func startingANewRoundRecordsZeroForEveryTeamNotYetScored() {
         var match = skyjoMatch()
-        match.setScore(8, for: match.teams[0].id, inRound: match.rounds[0].id)
-        match.startNewRound()
-        for team in match.teams {
-            match.setScore(1, for: team.id, inRound: match.rounds[1].id)
-        }
+        let (ada, grace, linus) = (match.teams[0].id, match.teams[1].id, match.teams[2].id)
+        match.setScore(8, for: ada, inRound: match.rounds[0].id)
 
-        #expect(match.totalsArePartial)
+        match.startNewRound()
+
+        #expect(match.rounds[0].points(for: ada) == 8)
+        #expect(match.rounds[0].points(for: grace) == 0)
+        #expect(match.rounds[0].points(for: linus) == 0)
+        #expect(!match.totalsArePartial)
     }
 
     @Test func theLowestTotalLeadsWhenTheLowestWins() {

@@ -27,7 +27,7 @@ public struct Round: Codable, Hashable, Identifiable, Sendable {
         scores.first { $0.team == team }?.points
     }
 
-    mutating func setPoints(_ points: Int, for team: Team.ID) {
+    mutating func setScore(_ points: Int, for team: Team.ID) {
         if let index = scores.firstIndex(where: { $0.team == team }) {
             scores[index].points = points
         } else {
@@ -40,8 +40,9 @@ public struct Round: Codable, Hashable, Identifiable, Sendable {
 /// so later edits to that Game never reach it.
 public struct Match: Codable, Hashable, Identifiable, Sendable {
     public let id: UUID
-    public var game: Game
-    public var teams: [Team]
+    public let game: Game
+    /// Composed at setup and fixed for the whole Match.
+    public let teams: [Team]
     public private(set) var rounds: [Round]
 
     /// A new Match opens on an empty first Round, ready to score.
@@ -55,7 +56,16 @@ public struct Match: Codable, Hashable, Identifiable, Sendable {
     /// Records a Team's points for a Round, replacing any Score already there.
     public mutating func setScore(_ points: Int, for team: Team.ID, inRound round: Round.ID) {
         guard let index = rounds.firstIndex(where: { $0.id == round }) else { return }
-        rounds[index].setPoints(points, for: team)
+        rounds[index].setScore(points, for: team)
+    }
+
+    public func round(_ id: Round.ID) -> Round? {
+        rounds.first { $0.id == id }
+    }
+
+    /// The Round's 1-based number on the scorepad.
+    public func number(of round: Round.ID) -> Int? {
+        rounds.firstIndex { $0.id == round }.map { $0 + 1 }
     }
 
     /// A new Round is offered once the last one has at least one Score, so the
@@ -64,8 +74,16 @@ public struct Match: Codable, Hashable, Identifiable, Sendable {
         rounds.last.map { !$0.scores.isEmpty } ?? true
     }
 
+    /// Moves on to a new Round. Moving on means every Team still unscored in
+    /// the last Round scored nothing, so each gets an explicit 0: only the Round
+    /// in play is ever partly filled.
     public mutating func startNewRound() {
         guard canStartNewRound else { return }
+        if let last = rounds.indices.last {
+            for team in teams where rounds[last].points(for: team.id) == nil {
+                rounds[last].setScore(0, for: team.id)
+            }
+        }
         rounds.append(Round())
     }
 

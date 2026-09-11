@@ -2,25 +2,17 @@ import XCTest
 
 // Acceptance-level UI behaviours. The scoring logic itself lives in Core, where
 // `swift test` covers it fast; these tests prove the screens are wired to it.
+@MainActor
 final class FinalScoreUITests: XCTestCase {
-    private var app: XCUIApplication!
-
-    override func setUpWithError() throws {
-        continueAfterFailure = false
-        app = XCUIApplication()
-        app.launch()
-    }
-
-    override func tearDownWithError() throws {
-        XCUIDevice.shared.orientation = .portrait
-    }
+    private lazy var app = XCUIApplication()
 
     func testScoringTwoSkyjoRoundsTotalsEachPlayer() throws {
+        launch()
         startSkyjoMatch(players: ["Ada", "Grace"])
 
-        // Round 1 opens on Ada's cell.
+        // Round 1 opens on Ada.
         press("1", "2", "next", "5", "next")
-        // "New Round" after the last Player: Round 2 opens on Ada's cell.
+        // "New Round" after the last Player: Round 2 opens on Ada.
         press("3", "sign", "next")
 
         XCTAssertTrue(app.staticTexts["partialTotalsNotice"].exists)
@@ -32,11 +24,12 @@ final class FinalScoreUITests: XCTestCase {
         XCTAssertEqual(total(1), "25")
         XCTAssertFalse(app.staticTexts["partialTotalsNotice"].exists)
         XCTAssertTrue(app.images["leader.0"].exists, "Lowest Total leads in Skyjo")
-        XCTAssertEqual(app.buttons["cell.2.0"].value as? String, "-3")
+        XCTAssertEqual(app.buttons["score.2.0"].value as? String, "-3")
         attachScreenshot(named: "Scorepad, portrait")
     }
 
     func testAMatchShowsAsInProgressAndResumesFromTheList() throws {
+        launch()
         startSkyjoMatch(players: ["Ada", "Grace"])
         press("7", "next", "next")
 
@@ -50,12 +43,12 @@ final class FinalScoreUITests: XCTestCase {
 
         XCTAssertTrue(app.staticTexts["total.0"].waitForExistence(timeout: 5))
         XCTAssertEqual(total(0), "7")
-        XCTAssertEqual(total(1), "0", "Next on an untouched cell records an explicit 0")
-        XCTAssertEqual(app.buttons["cell.1.1"].value as? String, "0")
+        XCTAssertEqual(total(1), "0", "Next on an untouched Score records an explicit 0")
+        XCTAssertEqual(app.buttons["score.1.1"].value as? String, "0")
     }
 
     func testScoringWorksInLandscape() throws {
-        XCUIDevice.shared.orientation = .landscapeLeft
+        launch(in: .landscapeLeft)
         startSkyjoMatch(players: ["Ada", "Grace", "Linus"])
 
         press("4", "next", "1", "1", "next", "6")
@@ -67,6 +60,12 @@ final class FinalScoreUITests: XCTestCase {
     }
 
     // MARK: Helpers
+
+    private func launch(in orientation: UIDeviceOrientation = .portrait) {
+        continueAfterFailure = false
+        XCUIDevice.shared.orientation = orientation
+        app.launch()
+    }
 
     private func startSkyjoMatch(players: [String]) {
         let newMatch = app.buttons["newMatchButton"]

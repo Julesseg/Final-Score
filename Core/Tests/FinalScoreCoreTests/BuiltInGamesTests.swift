@@ -14,6 +14,7 @@ struct BuiltInGamesTests {
         #expect(skyjo.endCondition == .targetTotal(100))
         #expect(skyjo.allowsNegative)
         #expect(skyjo.scorers == .everyone)
+        #expect(skyjo.tracksDealer)
         #expect(skyjo.isBuiltIn)
     }
 
@@ -39,6 +40,7 @@ struct BuiltInGamesTests {
         #expect(rami.playerCount == 2...6)
         #expect(rami.direction == .lowWins)
         #expect(rami.endCondition == .targetTotal(100))
+        #expect(rami.allowsNegative)
         #expect(rami.scorers == .everyone)
         #expect(rami.tracksDealer)
         #expect(rami.isBuiltIn)
@@ -52,6 +54,7 @@ struct BuiltInGamesTests {
         #expect(scrabble.playerCount == 2...4)
         #expect(scrabble.direction == .highWins)
         #expect(scrabble.endCondition == .none)
+        #expect(scrabble.allowsNegative, "Unplayed tiles are deducted at the end")
         #expect(scrabble.scorers == .everyone)
         #expect(!scrabble.tracksDealer)
         #expect(scrabble.isBuiltIn)
@@ -59,6 +62,22 @@ struct BuiltInGamesTests {
 
     @Test func theCatalogueOffersTheFourIndividualRoundsGames() {
         #expect(Game.builtIns.map(\.name) == ["Tarot", "Rami", "Skyjo", "Scrabble"])
+    }
+
+    @Test(arguments: Game.builtIns)
+    func everyBuiltInIsAnIndividualRoundsGameWithAnIdentity(game: Game) {
+        #expect(game.structure == .rounds)
+        #expect(game.teamPlay == .individual)
+        #expect(game.scorers == .everyone)
+        #expect(game.quickScores.isEmpty, "Quick scores arrive with #8")
+        #expect(!game.symbol.isEmpty)
+        #expect(game.playerCount.lowerBound >= 2)
+        #expect(game.isBuiltIn)
+    }
+
+    @Test func everyBuiltInHasItsOwnSymbolAndAccent() {
+        #expect(Set(Game.builtIns.map(\.symbol)).count == Game.builtIns.count)
+        #expect(Set(Game.builtIns.map(\.accent)).count == Game.builtIns.count)
     }
 
     @Test(arguments: Game.builtIns)

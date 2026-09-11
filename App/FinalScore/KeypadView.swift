@@ -1,17 +1,9 @@
 import SwiftUI
+import FinalScoreCore
 
-/// The keypad Override: digits, sign and delete for the selected cell.
+/// The keypad Override: digits, sign and delete for the selected Score.
 struct KeypadView: View {
-    let title: String
-    let text: String
-    let allowsNegative: Bool
-    let nextTitle: String
-    let onDigit: (Int) -> Void
-    let onDelete: () -> Void
-    let onToggleSign: () -> Void
-    let onNext: () -> Void
-    let onDismiss: () -> Void
-
+    @Binding var scorepad: Scorepad
     @Environment(\.verticalSizeClass) private var verticalSizeClass
 
     private var keyHeight: CGFloat {
@@ -26,10 +18,10 @@ struct KeypadView: View {
                     .foregroundStyle(.secondary)
                     .lineLimit(1)
                 Spacer()
-                Text(text)
+                Text(scorepad.keypadText)
                     .font(.title2.bold().monospacedDigit())
                     .accessibilityIdentifier("keypadDisplay")
-                Button("Hide Keypad", systemImage: "keyboard.chevron.compact.down", action: onDismiss)
+                Button("Hide Keypad", systemImage: "keyboard.chevron.compact.down") { scorepad.deselect() }
                     .labelStyle(.iconOnly)
                     .accessibilityIdentifier("hideKeypadButton")
             }
@@ -40,18 +32,18 @@ struct KeypadView: View {
                     }
                 }
                 GridRow {
-                    if allowsNegative {
-                        key("±", identifier: "key.sign", action: onToggleSign)
+                    if scorepad.match.game.allowsNegative {
+                        key(Text("±"), identifier: "key.sign") { scorepad.toggleSign() }
                             .accessibilityLabel("Change sign")
                     } else {
                         Color.clear.frame(height: keyHeight)
                     }
                     digitKey(0)
-                    key(Image(systemName: "delete.left"), identifier: "key.delete", action: onDelete)
+                    key(Image(systemName: "delete.left"), identifier: "key.delete") { scorepad.deleteBackward() }
                         .accessibilityLabel("Delete")
                 }
             }
-            Button(action: onNext) {
+            Button { scorepad.next() } label: {
                 Text(nextTitle)
                     .font(.headline)
                     .frame(maxWidth: .infinity, minHeight: keyHeight - 8)
@@ -63,12 +55,25 @@ struct KeypadView: View {
         .background(.bar)
     }
 
-    private func digitKey(_ digit: Int) -> some View {
-        key("\(digit)", identifier: "key.\(digit)") { onDigit(digit) }
+    /// "Grace · Round 2"
+    private var title: String {
+        guard let selection = scorepad.selection,
+              let team = scorepad.match.teams.first(where: { $0.id == selection.team }),
+              let round = scorepad.match.number(of: selection.round)
+        else { return "" }
+        return "\(team.name) · Round \(round)"
     }
 
-    private func key(_ label: String, identifier: String, action: @escaping () -> Void) -> some View {
-        key(Text(label), identifier: identifier, action: action)
+    private var nextTitle: String {
+        switch scorepad.nextStep {
+        case .nextTeam: "Next"
+        case .newRound: "New Round"
+        case .done: "Done"
+        }
+    }
+
+    private func digitKey(_ digit: Int) -> some View {
+        key(Text("\(digit)"), identifier: "key.\(digit)") { scorepad.type(digit) }
     }
 
     private func key(_ label: some View, identifier: String, action: @escaping () -> Void) -> some View {
