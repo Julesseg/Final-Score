@@ -1,0 +1,74 @@
+import SwiftUI
+import FinalScoreCore
+
+/// Home: every Match the user has started, and the way into a new one.
+struct MatchListView: View {
+    let library: MatchLibrary
+    @State private var path: [Match.ID] = []
+    @State private var isSettingUp = false
+
+    var body: some View {
+        NavigationStack(path: $path) {
+            List(library.matches) { match in
+                NavigationLink(value: match.id) {
+                    MatchRow(match: match)
+                }
+                .accessibilityIdentifier("matchRow")
+            }
+            .overlay {
+                if library.matches.isEmpty {
+                    ContentUnavailableView(
+                        "No Matches Yet",
+                        systemImage: "list.number",
+                        description: Text("Tap New Match to start scoring.")
+                    )
+                }
+            }
+            .navigationTitle("Matches")
+            .toolbar {
+                ToolbarItem(placement: .primaryAction) {
+                    Button("New Match", systemImage: "plus") { isSettingUp = true }
+                        .accessibilityIdentifier("newMatchButton")
+                }
+            }
+            .navigationDestination(for: Match.ID.self) { id in
+                if let match = library.match(id: id) {
+                    ScorepadView(match: Binding(
+                        get: { library.match(id: id) ?? match },
+                        set: { library.update($0) }
+                    ))
+                }
+            }
+            .sheet(isPresented: $isSettingUp) {
+                NewMatchView { match in
+                    library.add(match)
+                    isSettingUp = false
+                    path = [match.id]
+                }
+            }
+        }
+    }
+}
+
+private struct MatchRow: View {
+    let match: Match
+
+    var body: some View {
+        HStack(spacing: 12) {
+            GameSymbol(game: match.game)
+            VStack(alignment: .leading, spacing: 2) {
+                Text(match.game.name)
+                    .font(.headline)
+                Text(match.teams.map(\.name).formatted(.list(type: .and)))
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
+                Text("In progress · Round \(match.rounds.count)")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .accessibilityIdentifier("matchStatus")
+            }
+        }
+        .padding(.vertical, 2)
+    }
+}
