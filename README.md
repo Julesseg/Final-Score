@@ -61,7 +61,7 @@ App/<Name>UITests/    XCUITest acceptance suite (runs in CI on every PR)
                       + unblock-dispatch.yml / agent-implement.yml (agent auto-dispatch)
 ci/                   assemble-build-history.mjs + pipeline docs (ci/README.md)
 docs/agents/          auto-dispatch setup (self-hosted runner + Paseo)
-.claude/              Claude Code hooks, settings & the mirrored skill set
+.claude/              Claude Code hooks & settings
 scripts/rename.sh     placeholder → your identity
 ```
 
@@ -220,12 +220,12 @@ both stay green.
    under a `## Blocked by` heading in issue bodies — that's what the dispatcher
    scans for. An issue with no blockers qualifies too, and starts on the next
    issue close or a manual run of `unblock-dispatch.yml`.
-2. **Keep the `/label-and-implement-with-pr` skill** at
-   `.claude/skills/label-and-implement-with-pr/` — the dispatch prompt is
-   just `/label-and-implement-with-pr issue #<N>`, so the skill is what tells
-   the session how to work: claim the issue, call `/implement`, open the PR,
-   and babysit it until it merges.
-   Shipped in this repo, mirrored from the maintainer's personal skill set.
+2. **Keep the `/label-and-implement-with-pr` skill installed on the runner
+   Mac** (`~/.claude/skills/`) — the dispatch prompt is just
+   `/label-and-implement-with-pr issue #<N>`, so the skill is what tells the
+   session how to work: claim the issue, call `/implement`, open the PR, and
+   babysit it until it merges. Sessions run on that Mac and use its skills;
+   nothing ships in this repo.
 3. **Register a self-hosted macOS runner** (repo → Settings → Actions →
    Runners) on a Mac with the Paseo daemon running and `gh` + `claude` logged
    in.
@@ -275,14 +275,8 @@ Full walkthrough, scope rules, the in-flight cap, and the optional variables:
   local Linux machine it also reports whether a Swift toolchain is installed
   for `swift test`.
 
-`.claude/skills/` mirrors the maintainer's personal skill set, so a dispatched
-agent session finds `/label-and-implement-with-pr` (and the `/implement`,
-`/ui-report`, and `/babysit-pr` skills it calls) in any clone, on any machine,
-without depending on how that machine's Claude config happens to be set up. The
-personal copies under `~/.claude/skills/` are the source of truth — re-copy
-here when they change. The `paseo*` skills are
-deliberately left out: the Paseo app installs and updates those itself, so a
-committed copy would go stale unnoticed.
+Skills are not shipped in the repo: dispatched sessions run on the runner Mac
+and use the skills installed under its `~/.claude/skills/`.
 
 `AGENTS.md` carries the matching conventions (commit/PR-title format, "always
 implement the UI, let CI verify it"). Customize both for your project.
