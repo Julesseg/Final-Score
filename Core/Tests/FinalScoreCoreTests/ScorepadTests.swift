@@ -115,4 +115,92 @@ struct ScorepadTests {
 
         #expect(Scorepad(match: match).selection == nil)
     }
+
+    // MARK: Quick scores and ±1
+
+    @Test func aQuickScoreLandsAndPlusOneAdjustsIt() {
+        var scorepad = Scorepad(match: skyjoMatch())
+        let ada = scorepad.match.teams[0].id
+
+        scorepad.enterQuickScore(40)
+        #expect(scorepad.match.total(for: ada) == 40)
+        scorepad.adjust(by: 1)
+        scorepad.adjust(by: 1)
+
+        #expect(scorepad.match.total(for: ada) == 42)
+        #expect(scorepad.keypadText == "42")
+    }
+
+    @Test func minusOneCrossesZeroIntoNegatives() {
+        var scorepad = Scorepad(match: skyjoMatch())
+        let ada = scorepad.match.teams[0].id
+
+        scorepad.adjust(by: -1)
+
+        #expect(scorepad.match.total(for: ada) == -1)
+        #expect(scorepad.keypadText == "-1")
+    }
+
+    @Test func deleteAndSignEditAnAdjustedScore() {
+        var scorepad = Scorepad(match: skyjoMatch())
+        let ada = scorepad.match.teams[0].id
+        scorepad.enterQuickScore(40)
+        scorepad.adjust(by: 2)
+
+        scorepad.deleteBackward()
+        scorepad.toggleSign()
+
+        #expect(scorepad.match.total(for: ada) == -4)
+    }
+
+    @Test func plusOneOnAnUntouchedTeamScoresOne() {
+        var scorepad = Scorepad(match: skyjoMatch())
+        let round = scorepad.match.rounds[0]
+        let ada = scorepad.match.teams[0].id
+
+        scorepad.adjust(by: 1)
+
+        #expect(scorepad.match.round(round.id)?.points(for: ada) == 1)
+    }
+
+    @Test func adjustingASelectedScoreStartsFromItsPoints() {
+        var scorepad = Scorepad(match: skyjoMatch())
+        scorepad.type(1)
+        scorepad.type(5)
+        scorepad.next()
+        let ada = scorepad.match.teams[0].id
+        scorepad.select(.init(round: scorepad.match.rounds[0].id, team: ada))
+
+        scorepad.adjust(by: -1)
+
+        #expect(scorepad.match.total(for: ada) == 14)
+    }
+
+    @Test func theKeypadIgnoresQuickScores() {
+        var game = Game.skyjo
+        game.quickScores = [25, 50]
+        var scorepad = Scorepad(match: Match(game: game, teams: skyjoMatch().teams))
+        let ada = scorepad.match.teams[0].id
+
+        scorepad.enterQuickScore(50)
+        scorepad.adjust(by: 1)
+        scorepad.type(3)
+        scorepad.type(7)
+
+        #expect(scorepad.match.total(for: ada) == 37, "Typing replaces the Score, whatever the list holds")
+    }
+
+    @Test func minusOneStopsAtZeroWhenTheGameAllowsNoNegatives() {
+        var game = Game.skyjo
+        game.allowsNegative = false
+        var scorepad = Scorepad(match: Match(game: game, teams: skyjoMatch().teams))
+        let ada = scorepad.match.teams[0].id
+
+        scorepad.adjust(by: 1)
+        scorepad.adjust(by: -1)
+        scorepad.adjust(by: -1)
+
+        #expect(scorepad.match.total(for: ada) == 0)
+        #expect(scorepad.keypadText == "0")
+    }
 }
