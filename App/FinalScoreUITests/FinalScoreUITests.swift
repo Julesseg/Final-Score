@@ -389,14 +389,14 @@ final class FinalScoreUITests: XCTestCase {
     /// With no Matches, every built-in Game is a card, New Match sits at the
     /// bottom, and a card opens setup straight on its Game's Players.
     private func startSetupFromAGameCard(_ game: String) {
-        for name in ["Tarot", "Rami", "Skyjo", "Scrabble", "Points"] {
+        for name in ["Belote", "Tarot", "Rami", "Skyjo", "Scrabble", "Points"] {
             XCTAssertTrue(app.buttons["gameCard.\(name)"].waitForExistence(timeout: 10), "No card for \(name)")
         }
         XCTAssertFalse(app.buttons["matchRow"].exists)
         assertNewMatchIsPinnedToTheBottom()
         attachScreenshot(named: "First launch, \(XCUIDevice.shared.orientation.isLandscape ? "landscape" : "portrait")")
 
-        app.buttons["gameCard.\(game)"].tap()
+        tapGameCard(game)
 
         XCTAssertTrue(app.navigationBars[game].waitForExistence(timeout: 5), "Setup opens on \(game)")
         XCTAssertTrue(app.textFields["newPlayerName"].waitForExistence(timeout: 5))
@@ -407,6 +407,32 @@ final class FinalScoreUITests: XCTestCase {
         XCTAssertTrue(app.buttons["matchRow"].waitForExistence(timeout: 5))
         XCTAssertFalse(app.buttons["gameCard.\(game)"].exists, "The cards give way to the Match list")
         assertNewMatchIsPinnedToTheBottom()
+    }
+
+    /// Taps a Game's card and waits for its setup. Six Games overflow a small
+    /// phone in landscape, and the grid scrolls under the New Match button
+    /// pinned over it, so the card is scrolled clear first. A tap that lands on
+    /// that button anyway opens the Game list instead: it is cancelled and the
+    /// card tried once more, rather than failing on a mistimed scroll.
+    private func tapGameCard(_ game: String) {
+        let card = app.buttons["gameCard.\(game)"]
+        let newMatch = app.buttons["newMatchButton"]
+        XCTAssertTrue(card.waitForExistence(timeout: 10), "No card for \(game)")
+        for attempt in 1...2 {
+            for _ in 0..<5 where card.frame.maxY > newMatch.frame.minY {
+                app.swipeUp()
+            }
+            card.tap()
+            if app.navigationBars[game].waitForExistence(timeout: 5) { return }
+            let cancel = app.buttons["cancelNewMatchButton"]
+            XCTAssertTrue(
+                cancel.exists,
+                "Tapping \(game)'s card opened neither its setup nor the Game list"
+            )
+            cancel.tap()
+            XCTAssertTrue(card.waitForExistence(timeout: 5))
+            XCTAssertEqual(attempt, 1, "\(game)'s card never opened its setup")
+        }
     }
 
     /// A Match tied in play above a Match that ended tied, each row saying so.
