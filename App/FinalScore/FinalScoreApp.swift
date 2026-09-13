@@ -3,8 +3,16 @@ import FinalScoreCore
 
 @main
 struct FinalScoreApp: App {
-    @State private var library = MatchLibrary(store: MatchStore(directory: .matchesDirectory))
-    @State private var roster = PlayerLibrary(store: PlayerStore(file: .rosterFile))
+    @State private var library: MatchLibrary
+    @State private var roster: PlayerLibrary
+
+    init() {
+        let matches = MatchStore(directory: .matchesDirectory)
+        // Seeded from the Matches, for whoever played before there was a Roster.
+        let players = PlayerStore(file: .rosterFile, seedingFrom: matches.matches)
+        _library = State(initialValue: MatchLibrary(store: matches))
+        _roster = State(initialValue: PlayerLibrary(store: players))
+    }
 
     var body: some Scene {
         WindowGroup {
@@ -13,11 +21,9 @@ struct FinalScoreApp: App {
     }
 }
 
+/// Where the Matches and the Roster are kept. The only decision the app makes
+/// about persistence — the files themselves are Core's business (ADR-0001).
 private extension URL {
-    // Where the Matches and the roster are kept: the only decision the app
-    // makes about persistence — the files themselves are Core's business
-    // (ADR-0001).
-
     static var matchesDirectory: URL {
         dataDirectory.appending(path: "Matches", directoryHint: .isDirectory)
     }

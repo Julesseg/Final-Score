@@ -1,14 +1,13 @@
 import Foundation
 
-/// The New Match form: a Game, and the Players from the roster who will play it.
+/// The New Match form: a Game, and the Players from the Roster who will play it.
 public struct MatchSetup: Sendable {
     public let game: Game
     /// Everyone who could be picked. Handing it a roster that has lost a
     /// picked Player gives up that Player's seat.
     public var roster: [Player] {
         didSet {
-            let onRoster = Set(roster.map(\.id))
-            seating.removeAll { !onRoster.contains($0) }
+            seating.removeAll { id in !roster.contains { $0.id == id } }
         }
     }
     /// The picked Players, in Seating order.
@@ -21,12 +20,17 @@ public struct MatchSetup: Sendable {
     public init(game: Game, roster: [Player], previous: Match?) {
         self.game = game
         self.roster = roster
-        let onRoster = Set(roster.map(\.id))
         seating = Array(
-            (previous?.teams.flatMap(\.players).map(\.id) ?? [])
-                .filter(onRoster.contains)
+            (previous?.players ?? [])
+                .filter { player in roster.contains { $0.id == player.id } }
+                .map(\.id)
                 .prefix(game.playerCount.upperBound)
         )
+    }
+
+    /// The Player's 1-based seat, or nil while they aren't picked.
+    public func seat(of player: Player.ID) -> Int? {
+        seating.firstIndex(of: player).map { $0 + 1 }
     }
 
     /// Whether tapping the Player would do anything: a picked Player can always
@@ -57,7 +61,7 @@ public struct MatchSetup: Sendable {
 
     /// The Match these Players start, each as a Team of one in Seating order;
     /// nil until `canStart`. The Match takes its own copy of every Player, so
-    /// later roster edits never reach it.
+    /// later Roster edits never reach it.
     public func makeMatch() -> Match? {
         guard canStart else { return nil }
         let teams = seating

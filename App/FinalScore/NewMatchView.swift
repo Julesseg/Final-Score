@@ -1,7 +1,7 @@
 import SwiftUI
 import FinalScoreCore
 
-/// New Match: pick a Game, then pick its Players from the roster.
+/// New Match: pick a Game, then pick its Players from the Roster.
 struct NewMatchView: View {
     let roster: PlayerLibrary
     /// The most recent Match, whose Players come pre-picked.
@@ -40,7 +40,7 @@ struct NewMatchView: View {
     }
 }
 
-/// The roster, with a tap to pick each Player into the next seat. Swiping a
+/// The Roster, with a tap to pick each Player into the next seat. Swiping a
 /// Player renames or deletes them; + Add Player meets someone new inline.
 private struct PlayersView: View {
     let roster: PlayerLibrary
@@ -56,7 +56,7 @@ private struct PlayersView: View {
         self.roster = roster
         self.onStart = onStart
         _setup = State(initialValue: MatchSetup(game: game, roster: roster.players, previous: previous))
-        // With nobody on the roster yet, there is nothing to do but add someone.
+        // With nobody on the Roster yet, there is nothing to do but add someone.
         _isAddingPlayer = State(initialValue: roster.players.isEmpty)
     }
 
@@ -111,12 +111,13 @@ private struct PlayersView: View {
                 .accessibilityIdentifier("renamePlayerName")
             Button("Cancel", role: .cancel) {}
             Button("Rename") { roster.rename(player, to: newName) }
+                .disabled(!roster.canRename(player, to: newName))
                 .accessibilityIdentifier("confirmRenameButton")
         }
     }
 
     private func row(for player: Player) -> some View {
-        let seat = setup.seating.firstIndex(of: player.id).map { $0 + 1 }
+        let seat = setup.seat(of: player.id)
         return Button {
             setup.toggle(player.id)
         } label: {
@@ -132,7 +133,9 @@ private struct PlayersView: View {
             }
             .contentShape(Rectangle())
         }
-        .swipeActions {
+        // No full swipe: on a list tapped to pick Players, a stray swipe
+        // shouldn't delete one.
+        .swipeActions(allowsFullSwipe: false) {
             Button("Delete", systemImage: "trash", role: .destructive) { roster.delete(player) }
             Button("Rename", systemImage: "pencil") {
                 newName = player.name
@@ -149,9 +152,11 @@ private struct PlayersView: View {
     /// name. Submitting it blank puts the field away.
     private func addPlayer() {
         guard let player = roster.add(named: newPlayerName) else {
-            isAddingPlayer = !newPlayerName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+            isAddingPlayer = false
             return
         }
+        // Handed over now rather than left to `onChange`, which runs too late
+        // for `pick` to find the new Player on the Roster.
         setup.roster = roster.players
         setup.pick(player.id)
         newPlayerName = ""

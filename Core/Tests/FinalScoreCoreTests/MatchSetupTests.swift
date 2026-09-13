@@ -22,6 +22,8 @@ struct MatchSetupTests {
         let setup = MatchSetup(game: .skyjo, roster: roster, previous: previous)
 
         #expect(setup.seating == [linus.id, ada.id, grace.id])
+        #expect(setup.seat(of: ada.id) == 2)
+        #expect(setup.seat(of: marie.id) == nil)
         #expect(setup.canStart)
     }
 
