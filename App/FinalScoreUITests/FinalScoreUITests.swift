@@ -365,8 +365,13 @@ final class FinalScoreUITests: XCTestCase {
         rotation.buttons["Counter-clockwise"].tap()
         tapStart()
 
+        // With the keypad up, a small phone has room for hardly any Rounds, so
+        // it is put away whenever the badges are read.
+        hideKeypad()
         XCTAssertEqual(dealer(inRound: 1), "Ada", "Seat 1 deals first")
+        app.buttons["score.1.0"].tap()
         press("1", "next", "next", "next")
+        hideKeypad()
         XCTAssertEqual(dealer(inRound: 2), "Linus", "Counter-clockwise, the deal wraps round to the last seat")
 
         // A misdeal: Grace deals Round 2 instead.
@@ -376,10 +381,19 @@ final class FinalScoreUITests: XCTestCase {
         grace.tap()
         XCTAssertEqual(dealer(inRound: 2), "Grace")
 
+        app.buttons["score.2.0"].tap()
         press("2", "next", "next", "next")
+        hideKeypad()
 
         XCTAssertEqual(dealer(inRound: 3), "Ada", "The deal passes on from whoever was handed it")
         XCTAssertEqual(dealer(inRound: 1), "Ada", "Earlier Rounds keep their Dealer")
+    }
+
+    private func hideKeypad() {
+        let hide = app.buttons["hideKeypadButton"]
+        XCTAssertTrue(hide.waitForExistence(timeout: 5))
+        hide.tap()
+        XCTAssertTrue(app.buttons["key.next"].waitForNonExistence(timeout: 5))
     }
 
     private func dealer(inRound number: Int) -> String? {
