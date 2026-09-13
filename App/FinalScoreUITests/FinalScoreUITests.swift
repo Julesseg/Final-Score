@@ -320,6 +320,7 @@ final class FinalScoreUITests: XCTestCase {
         attachScreenshot(named: "Tally, portrait")
 
         // A Score is corrected from the history, like any other.
+        scrollToReveal(app.buttons["history.4"])
         app.buttons["history.4"].tap()
         press("2", "0", "next")
         XCTAssertEqual(total(1), "19")
@@ -462,10 +463,22 @@ final class FinalScoreUITests: XCTestCase {
 
         let history = app.buttons["history.4"]
         XCTAssertFalse(history.exists, "The history sits behind a disclosure")
-        element("history").tap()
+        let disclosure = element("history")
+        scrollToReveal(disclosure)
+        disclosure.tap()
+        scrollToReveal(history)
         XCTAssertTrue(history.waitForExistence(timeout: 5))
         XCTAssertEqual(history.value as? String, "+12")
         XCTAssertEqual(app.buttons["history.3"].value as? String, "-1")
+    }
+
+    /// Scrolls the board down until the element is on screen: on a short
+    /// landscape phone the history starts below the Teams, and its rows are
+    /// only built once they scroll into view.
+    private func scrollToReveal(_ element: XCUIElement) {
+        for _ in 0..<5 where !(element.exists && element.isHittable) {
+            app.scrollViews.firstMatch.swipeUp()
+        }
     }
 
     private func tap(_ identifiers: String...) {
@@ -556,8 +569,14 @@ final class FinalScoreUITests: XCTestCase {
         XCTAssertTrue(newMatch.waitForExistence(timeout: 10))
         newMatch.tap()
 
+        // The list only builds rows on screen: a short landscape phone has to
+        // scroll to reach the last Games.
         let gameRow = app.buttons["game.\(game)"]
-        XCTAssertTrue(gameRow.waitForExistence(timeout: 5))
+        XCTAssertTrue(app.buttons["game.Tarot"].waitForExistence(timeout: 5))
+        for _ in 0..<3 where !gameRow.isHittable {
+            app.collectionViews.firstMatch.swipeUp()
+        }
+        XCTAssertTrue(gameRow.waitForExistence(timeout: 5), "No Game \(game)")
         gameRow.tap()
     }
 
