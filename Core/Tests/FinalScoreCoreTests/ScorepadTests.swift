@@ -5,9 +5,7 @@ import Testing
 struct ScorepadTests {
     /// A Skyjo Match between Ada, Grace and Linus, in that column order.
     private func skyjoMatch() -> Match {
-        var setup = MatchSetup(game: .skyjo)
-        setup.playerNames = ["Ada", "Grace", "Linus"]
-        return setup.makeMatch()!
+        Match(game: .skyjo, teams: ["Ada", "Grace", "Linus"].map { Team(players: [Player(name: $0)]) })
     }
 
     @Test func aNewMatchOpensOnItsFirstTeam() {

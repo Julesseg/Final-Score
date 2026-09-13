@@ -1,8 +1,11 @@
 import SwiftUI
 import FinalScoreCore
 
-/// New Match: pick a Game, then name the Players.
+/// New Match: pick a Game, then pick its Players from the roster.
 struct NewMatchView: View {
+    let roster: PlayerLibrary
+    /// The most recent Match, whose Players come pre-picked.
+    let previous: Match?
     let onStart: (Match) -> Void
     @Environment(\.dismiss) private var dismiss
 
@@ -10,7 +13,7 @@ struct NewMatchView: View {
         NavigationStack {
             List(Game.builtIns, id: \.name) { game in
                 NavigationLink {
-                    PlayersView(game: game, onStart: onStart)
+                    PlayersView(game: game, roster: roster, previous: previous, onStart: onStart)
                 } label: {
                     HStack(spacing: 12) {
                         GameSymbol(game: game)
@@ -30,43 +33,52 @@ struct NewMatchView: View {
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Cancel") { dismiss() }
+                        .accessibilityIdentifier("cancelNewMatchButton")
                 }
             }
         }
     }
 }
 
+/// The roster, with a tap to pick each Player into the next seat. Swiping a
+/// Player renames or deletes them; + Add Player meets someone new inline.
 private struct PlayersView: View {
+    let roster: PlayerLibrary
     let onStart: (Match) -> Void
     @State private var setup: MatchSetup
-    @FocusState private var focusedPlayer: Int?
+    @State private var isAddingPlayer: Bool
+    @State private var newPlayerName = ""
+    @FocusState private var isNamingNewPlayer: Bool
+    @State private var renaming: Player?
+    @State private var newName = ""
 
-    init(game: Game, onStart: @escaping (Match) -> Void) {
+    init(game: Game, roster: PlayerLibrary, previous: Match?, onStart: @escaping (Match) -> Void) {
+        self.roster = roster
         self.onStart = onStart
-        _setup = State(initialValue: MatchSetup(game: game))
+        _setup = State(initialValue: MatchSetup(game: game, roster: roster.players, previous: previous))
+        // With nobody on the roster yet, there is nothing to do but add someone.
+        _isAddingPlayer = State(initialValue: roster.players.isEmpty)
     }
 
     var body: some View {
         Form {
             Section {
-                ForEach(setup.playerNames.indices, id: \.self) { index in
-                    TextField("Player \(index + 1)", text: name(at: index))
+                ForEach(roster.players) { player in
+                    row(for: player)
+                }
+
+                if isAddingPlayer {
+                    TextField("Name", text: $newPlayerName)
                         .textInputAutocapitalization(.words)
                         .autocorrectionDisabled()
-                        .focused($focusedPlayer, equals: index)
-                        .submitLabel(index == setup.playerNames.count - 1 ? .done : .next)
-                        .onSubmit { focusedPlayer = index + 1 < setup.playerNames.count ? index + 1 : nil }
-                        .accessibilityIdentifier("playerName.\(index)")
-                }
-                .onDelete { offsets in
-                    offsets.first.map { setup.removePlayer(at: $0) }
-                }
-                .deleteDisabled(!setup.canRemovePlayer)
-
-                if setup.canAddPlayer {
+                        .focused($isNamingNewPlayer)
+                        .submitLabel(.done)
+                        .onSubmit(addPlayer)
+                        .accessibilityIdentifier("newPlayerName")
+                } else {
                     Button("Add Player", systemImage: "plus") {
-                        setup.addPlayer()
-                        focusedPlayer = setup.playerNames.count - 1
+                        isAddingPlayer = true
+                        isNamingNewPlayer = true
                     }
                     .accessibilityIdentifier("addPlayerButton")
                 }
@@ -86,14 +98,67 @@ private struct PlayersView: View {
                 .accessibilityIdentifier("startMatchButton")
             }
         }
-        .onAppear { focusedPlayer = 0 }
+        .onChange(of: roster.players) { _, players in
+            setup.roster = players
+        }
+        .onAppear {
+            isNamingNewPlayer = isAddingPlayer
+        }
+        .alert("Rename Player", isPresented: isRenaming, presenting: renaming) { player in
+            TextField("Name", text: $newName)
+                .textInputAutocapitalization(.words)
+                .autocorrectionDisabled()
+                .accessibilityIdentifier("renamePlayerName")
+            Button("Cancel", role: .cancel) {}
+            Button("Rename") { roster.rename(player, to: newName) }
+                .accessibilityIdentifier("confirmRenameButton")
+        }
     }
 
-    /// Bounds-checked, so a row animating out after a delete can't read past the end.
-    private func name(at index: Int) -> Binding<String> {
-        Binding(
-            get: { setup.playerNames.indices.contains(index) ? setup.playerNames[index] : "" },
-            set: { if setup.playerNames.indices.contains(index) { setup.playerNames[index] = $0 } }
-        )
+    private func row(for player: Player) -> some View {
+        let seat = setup.seating.firstIndex(of: player.id).map { $0 + 1 }
+        return Button {
+            setup.toggle(player.id)
+        } label: {
+            HStack {
+                Text(player.name)
+                    .foregroundStyle(setup.canPick(player.id) ? .primary : .secondary)
+                Spacer()
+                // The seat number, so the Seating order is visible as it's picked.
+                Image(systemName: seat.map { "\($0).circle.fill" } ?? "circle")
+                    .font(.title2)
+                    .foregroundStyle(seat == nil ? AnyShapeStyle(.tertiary) : AnyShapeStyle(.tint))
+                    .accessibilityHidden(true)
+            }
+            .contentShape(Rectangle())
+        }
+        .swipeActions {
+            Button("Delete", systemImage: "trash", role: .destructive) { roster.delete(player) }
+            Button("Rename", systemImage: "pencil") {
+                newName = player.name
+                renaming = player
+            }
+            .tint(.orange)
+        }
+        .accessibilityIdentifier("player.\(player.name)")
+        .accessibilityValue(seat.map { "Seat \($0)" } ?? "")
+        .accessibilityAddTraits(seat == nil ? [] : .isSelected)
+    }
+
+    /// Adds the name typed and picks that Player, then stays open for the next
+    /// name. Submitting it blank puts the field away.
+    private func addPlayer() {
+        guard let player = roster.add(named: newPlayerName) else {
+            isAddingPlayer = !newPlayerName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+            return
+        }
+        setup.roster = roster.players
+        setup.pick(player.id)
+        newPlayerName = ""
+        isNamingNewPlayer = true
+    }
+
+    private var isRenaming: Binding<Bool> {
+        Binding(get: { renaming != nil }, set: { if !$0 { renaming = nil } })
     }
 }

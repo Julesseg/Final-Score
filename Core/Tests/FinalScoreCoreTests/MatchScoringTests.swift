@@ -6,9 +6,7 @@ import Foundation
 struct MatchScoringTests {
     /// A Skyjo Match between Ada, Grace and Linus, in that column order.
     private func skyjoMatch() -> Match {
-        var setup = MatchSetup(game: .skyjo)
-        setup.playerNames = ["Ada", "Grace", "Linus"]
-        return setup.makeMatch()!
+        Match(game: .skyjo, teams: ["Ada", "Grace", "Linus"].map { Team(players: [Player(name: $0)]) })
     }
 
     @Test func totalsSumEachTeamsScoresAcrossRounds() {
@@ -101,9 +99,7 @@ struct MatchScoringTests {
     }
 
     @Test func theHighestTotalLeadsWhenTheHighestWins() {
-        var setup = MatchSetup(game: .tarot)
-        setup.playerNames = ["Ada", "Grace", "Linus"]
-        var match = setup.makeMatch()!
+        var match = Match(game: .tarot, teams: ["Ada", "Grace", "Linus"].map { Team(players: [Player(name: $0)]) })
         let round = match.rounds[0].id
         match.setScore(-40, for: match.teams[0].id, inRound: round)
         match.setScore(80, for: match.teams[1].id, inRound: round)
