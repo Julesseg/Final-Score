@@ -85,6 +85,26 @@ struct DealerTests {
         #expect(match.rounds.map(\.dealer) == [grace.id, linus.id, grace.id])
     }
 
+    @Test func afterDeletingAMisdealtLastRoundTheNextRoundPassesOnFromTheRoundBefore() {
+        var match = skyjoMatch(rotation: .clockwise)
+        playRound(of: &match)
+        playRound(of: &match)
+
+        match.deleteRound(match.rounds[2].id)
+        playRound(of: &match)
+
+        #expect(match.rounds.map(\.dealer) == [ada.id, grace.id, linus.id])
+    }
+
+    @Test func deletingTheOnlyRoundLeavesItsDealerToDealAgain() {
+        var match = skyjoMatch(rotation: .clockwise)
+        match.setDealer(linus.id, inRound: match.rounds[0].id)
+
+        match.deleteRound(match.rounds[0].id)
+
+        #expect(match.rounds.map(\.dealer) == [linus.id])
+    }
+
     @Test func onlyAPlayerInTheMatchCanBeMadeDealer() {
         var match = skyjoMatch(rotation: .clockwise)
 

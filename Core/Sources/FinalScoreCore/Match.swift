@@ -125,11 +125,13 @@ public struct Match: Codable, Hashable, Identifiable, Sendable {
 
     /// Takes a misdealt Round off the scorepad, Scores and all. Round numbers
     /// come from position, so the Rounds after it close up. A Match is never
-    /// without a Round: deleting the only one leaves an empty one to score.
+    /// without a Round: deleting the only one leaves an empty one to score,
+    /// dealt again by the same Dealer.
     public mutating func deleteRound(_ id: Round.ID) {
+        let dealer = rounds.first { $0.id == id }?.dealer
         rounds.removeAll { $0.id == id }
         if rounds.isEmpty {
-            rounds = [Round()]
+            rounds = [Round(dealer: dealer)]
         }
     }
 
