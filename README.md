@@ -223,7 +223,8 @@ both stay green.
 2. **Keep the `/label-and-implement-with-pr` skill** at
    `.claude/skills/label-and-implement-with-pr/` — the dispatch prompt is
    just `/label-and-implement-with-pr issue #<N>`, so the skill is what tells
-   the session how to work: claim the issue, call `/implement`, open the PR.
+   the session how to work: claim the issue, call `/implement`, open the PR,
+   and babysit it until it merges.
    Shipped in this repo, mirrored from the maintainer's personal skill set.
 3. **Register a self-hosted macOS runner** (repo → Settings → Actions →
    Runners) on a Mac with the Paseo daemon running and `gh` + `claude` logged
@@ -275,10 +276,11 @@ Full walkthrough, scope rules, the in-flight cap, and the optional variables:
   for `swift test`.
 
 `.claude/skills/` mirrors the maintainer's personal skill set, so a dispatched
-agent session finds `/label-and-implement-with-pr` (and the `/implement` skill
-it calls) in any clone, on any machine, without depending on how that machine's
-Claude config happens to be set up. The personal copies under `~/.claude/skills/`
-are the source of truth — re-copy here when they change. The `paseo*` skills are
+agent session finds `/label-and-implement-with-pr` (and the `/implement`,
+`/ui-report`, and `/babysit-pr` skills it calls) in any clone, on any machine,
+without depending on how that machine's Claude config happens to be set up. The
+personal copies under `~/.claude/skills/` are the source of truth — re-copy
+here when they change. The `paseo*` skills are
 deliberately left out: the Paseo app installs and updates those itself, so a
 committed copy would go stale unnoticed.
 
