@@ -9,12 +9,16 @@ import FinalScoreCore
 @Observable
 final class MatchLibrary {
     private let store: MatchStore
-    /// Newest first, as the store orders them.
+    /// In progress above finished, as the store lists them.
     private(set) var matches: [Match]
+    /// The Match started most recently, ended or not: whose Players a new
+    /// Match opens with.
+    private(set) var lastStarted: Match?
 
     init(store: MatchStore) {
         self.store = store
         matches = store.matches
+        lastStarted = store.newestStartedFirst.first
     }
 
     func match(id: Match.ID) -> Match? {
@@ -35,5 +39,6 @@ final class MatchLibrary {
             )
         }
         matches = store.matches
+        lastStarted = store.newestStartedFirst.first
     }
 }

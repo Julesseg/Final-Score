@@ -268,4 +268,65 @@ struct ScorepadTests {
         #expect(scorepad.match.total(for: ada) == 0)
         #expect(scorepad.keypadText == "0")
     }
+
+    @Test func endingTheMatchPutsTheKeypadAway() {
+        var scorepad = Scorepad(match: skyjoMatch())
+        scorepad.type(7)
+        scorepad.next()
+        scorepad.type(2)
+
+        scorepad.endMatch()
+
+        #expect(scorepad.match.isEnded)
+        #expect(scorepad.selection == nil)
+        #expect(scorepad.match.outcome == .won(by: scorepad.match.teams[2]), "Linus's unscored 0 is lowest")
+    }
+
+    @Test func deletingTheRoundTheKeypadIsOnInAnEndedMatchLeavesTheKeypadAway() {
+        var scorepad = Scorepad(match: skyjoMatch())
+        scorepad.type(7)
+        scorepad.endMatch()
+        let only = scorepad.match.rounds[0].id
+        scorepad.select(.init(round: only, team: scorepad.match.teams[0].id))
+
+        scorepad.deleteRound(only)
+
+        #expect(scorepad.match.rounds.count == 1)
+        #expect(scorepad.selection == nil, "An ended Match only opens the keypad when a Score is tapped")
+    }
+
+    @Test func reopeningAnEndedMatchOpensWithTheKeypadAway() {
+        var match = skyjoMatch()
+        match.setScore(6, for: match.teams[0].id, inRound: match.rounds[0].id)
+        match.end()
+        match.startNewRound()
+
+        #expect(Scorepad(match: match).selection == nil)
+    }
+
+    @Test func nextOnTheLastTeamOfAnEndedMatchPutsTheKeypadAwayRatherThanStartingARound() {
+        var scorepad = Scorepad(match: skyjoMatch())
+        scorepad.type(3)
+        scorepad.endMatch()
+        let lastRound = scorepad.match.rounds[0].id
+
+        scorepad.select(.init(round: lastRound, team: scorepad.match.teams[2].id))
+        #expect(scorepad.nextStep == .done)
+        scorepad.next()
+
+        #expect(scorepad.match.rounds.count == 1)
+        #expect(scorepad.selection == nil)
+    }
+
+    @Test func aScoreOnAnEndedMatchCanStillBeCorrected() {
+        var match = skyjoMatch()
+        match.setScore(6, for: match.teams[0].id, inRound: match.rounds[0].id)
+        var scorepad = Scorepad(match: match)
+        scorepad.endMatch()
+
+        scorepad.select(.init(round: scorepad.match.rounds[0].id, team: scorepad.match.teams[0].id))
+        scorepad.type(9)
+
+        #expect(scorepad.match.total(for: scorepad.match.teams[0].id) == 9)
+    }
 }

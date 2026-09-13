@@ -19,10 +19,14 @@ public struct Scorepad: Sendable {
     public private(set) var selection: Position?
     private var typed = Override()
 
-    /// Opens on the first Team still unscored in the last Round, if any.
+    /// Opens on the first Team still unscored in the last Round, if any — or
+    /// with the keypad away on an ended Match, which is only reopened to look
+    /// at or to correct.
     public init(match: Match) {
         self.match = match
-        selectFirstUnscoredTeam()
+        if !match.isEnded {
+            selectFirstUnscoredTeam()
+        }
     }
 
     public var keypadText: String {
@@ -76,13 +80,14 @@ public struct Scorepad: Sendable {
         case nextTeam
         /// Starts a new Round, after the last Team of the last Round.
         case newRound
-        /// Puts the keypad away, after the last Team of an earlier Round.
+        /// Puts the keypad away, after the last Team of an earlier Round or of
+        /// an ended Match.
         case done
     }
 
     public var nextStep: NextStep {
         if teamAfterSelection != nil { return .nextTeam }
-        return selection?.round == match.rounds.last?.id ? .newRound : .done
+        return !match.isEnded && selection?.round == match.rounds.last?.id ? .newRound : .done
     }
 
     /// Lands the selected Score — a Team left untouched gets an explicit 0,
@@ -110,13 +115,22 @@ public struct Scorepad: Sendable {
     }
 
     /// Deletes a Round. A keypad on it moves to the first Team still unscored
-    /// in the last Round, or is put away if there is none; anywhere else it
-    /// stays put.
+    /// in the last Round, or is put away if there is none or the Match is
+    /// ended; anywhere else it stays put.
     public mutating func deleteRound(_ id: Round.ID) {
         match.deleteRound(id)
         guard selection?.round == id else { return }
         deselect()
-        selectFirstUnscoredTeam()
+        if !match.isEnded {
+            selectFirstUnscoredTeam()
+        }
+    }
+
+    /// Ends the Match and puts the keypad away. Any Score can still be selected
+    /// and corrected afterwards.
+    public mutating func endMatch() {
+        deselect()
+        match.end()
     }
 
     private var teamAfterSelection: Team.ID? {

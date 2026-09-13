@@ -22,8 +22,9 @@ public final class PlayerStore {
     ///
     /// The first time there is no Roster to open, it starts with the Players of
     /// `matches` — the ones played before there was a Roster — so their last
-    /// Match can still be pre-selected. Pass them newest first, as `MatchStore`
-    /// lists them: a name played under more than once keeps its newest Player.
+    /// Match can still be pre-selected. Pass them newest first, as
+    /// `MatchStore.newestStartedFirst` lists them: a name played under more than
+    /// once keeps its newest Player.
     ///
     /// Nothing here throws. A Roster that can't be read is moved aside, never
     /// overwritten, and a fresh one is started in its place.

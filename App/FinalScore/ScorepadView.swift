@@ -8,6 +8,7 @@ import FinalScoreCore
 struct ScorepadView: View {
     @Binding var match: Match
     @State private var scorepad: Scorepad
+    @State private var isConfirmingEnd = false
     @Environment(\.verticalSizeClass) private var verticalSizeClass
 
     init(match: Binding<Match>) {
@@ -19,7 +20,10 @@ struct ScorepadView: View {
         Group {
             if verticalSizeClass == .compact {
                 HStack(spacing: 0) {
-                    grid
+                    VStack(spacing: 0) {
+                        banner
+                        grid
+                    }
                     if scorepad.selection != nil {
                         Divider()
                         KeypadView(scorepad: $scorepad)
@@ -28,6 +32,7 @@ struct ScorepadView: View {
                 }
             } else {
                 VStack(spacing: 0) {
+                    banner
                     grid
                     if scorepad.selection != nil {
                         Divider()
@@ -37,14 +42,28 @@ struct ScorepadView: View {
             }
         }
         .tint(game.accent.color)
+        .animation(.default, value: scorepad.match.endConditionIsReached)
+        .animation(.default, value: scorepad.match.isEnded)
         .navigationTitle(game.name)
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
-            ToolbarItem(placement: .primaryAction) {
-                Button("New Round", systemImage: "plus") { scorepad.startNewRound() }
-                    .disabled(!scorepad.match.canStartNewRound)
-                    .accessibilityIdentifier("newRoundButton")
+            if !scorepad.match.isEnded {
+                ToolbarItem(placement: .primaryAction) {
+                    Button("End Match", systemImage: "flag.checkered") { isConfirmingEnd = true }
+                        .accessibilityIdentifier("endMatchButton")
+                }
+                ToolbarItem(placement: .primaryAction) {
+                    Button("New Round", systemImage: "plus") { scorepad.startNewRound() }
+                        .disabled(!scorepad.match.canStartNewRound)
+                        .accessibilityIdentifier("newRoundButton")
+                }
             }
+        }
+        .alert("End this Match?", isPresented: $isConfirmingEnd) {
+            Button("Cancel", role: .cancel) {}
+            Button("End Match") { scorepad.endMatch() }
+        } message: {
+            Text(endMessage)
         }
         .onChange(of: scorepad.match) { _, updated in
             match = updated
@@ -53,6 +72,58 @@ struct ScorepadView: View {
 
     private var game: Game { scorepad.match.game }
     private var teams: [Team] { scorepad.match.teams }
+
+    /// Warns when ending will give a Team still unscored in the last Round a 0.
+    private var endMessage: String {
+        let match = scorepad.match
+        let unscored = match.rounds.last.map { match.unscoredTeams(in: $0) } ?? []
+        let zeroes = unscored.isEmpty || unscored.count == teams.count
+            ? ""
+            : "\(unscored.map(\.name).formatted(.list(type: .and))) will score 0 this Round. "
+        return zeroes + "Scores can still be corrected afterwards."
+    }
+
+    // MARK: Banner
+
+    /// Once ended, the Winner; before that, the End condition's announcement
+    /// once it is reached. Never in the way of scoring.
+    @ViewBuilder
+    private var banner: some View {
+        let match = scorepad.match
+        if match.isEnded {
+            Label(match.outcomeText ?? "Match ended", systemImage: "trophy.fill")
+                .font(.headline)
+                .foregroundStyle(.tint)
+                .frame(maxWidth: .infinity)
+                .accessibilityElement(children: .combine)
+                .accessibilityIdentifier("outcome")
+                .modifier(BannerStyle(isCompact: verticalSizeClass == .compact))
+        } else if match.endConditionIsReached, let reason = match.endConditionText {
+            HStack(spacing: 12) {
+                Image(systemName: "flag.checkered")
+                    .font(.title3)
+                    .foregroundStyle(.tint)
+                    .accessibilityHidden(true)
+                VStack(alignment: .leading, spacing: 0) {
+                    Text(reason)
+                        .font(.subheadline.bold())
+                    if let standing = match.standingText {
+                        Text(standing)
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                }
+                .accessibilityElement(children: .combine)
+                .accessibilityIdentifier("endConditionNotice")
+                Spacer(minLength: 8)
+                Button("End Match") { isConfirmingEnd = true }
+                    .buttonStyle(.borderedProminent)
+                    .controlSize(.small)
+                    .accessibilityIdentifier("endMatchFromNotice")
+            }
+            .modifier(BannerStyle(isCompact: verticalSizeClass == .compact))
+        }
+    }
 
     // MARK: Grid
 
@@ -213,5 +284,18 @@ struct ScorepadView: View {
         }
         .padding(.vertical, 10)
         .frame(maxWidth: .infinity, alignment: .leading)
+    }
+}
+
+/// A full-width strip across the top of the scorepad, slimmer in landscape.
+private struct BannerStyle: ViewModifier {
+    let isCompact: Bool
+
+    func body(content: Content) -> some View {
+        content
+            .padding(.horizontal)
+            .padding(.vertical, isCompact ? 6 : 10)
+            .background(.tint.opacity(0.12))
+            .transition(.move(edge: .top).combined(with: .opacity))
     }
 }

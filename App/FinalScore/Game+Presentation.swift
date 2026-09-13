@@ -33,6 +33,36 @@ extension Game {
     }
 }
 
+extension Match {
+    /// "Grace wins", "Ada and Linus tie", or nil while in play or without a Score.
+    var outcomeText: String? {
+        outcome.map { $0.text(wins: "wins", tie: "tie") }
+    }
+
+    /// "Grace would win", or nil before the first Score.
+    var standingText: String? {
+        standing.map { $0.text(wins: "would win", tie: "would tie") }
+    }
+
+    /// What the End condition says, once reached: "A Total reached 100".
+    var endConditionText: String? {
+        switch game.endCondition {
+        case .none: nil
+        case .targetTotal(let target): "A Total reached \(target)"
+        case .roundCount(let count): "\(count) Rounds played"
+        }
+    }
+}
+
+private extension Match.Outcome {
+    func text(wins: String, tie: String) -> String {
+        switch self {
+        case .won(let team): "\(team.name) \(wins)"
+        case .tied(let teams): "\(teams.map(\.name).formatted(.list(type: .and))) \(tie)"
+        }
+    }
+}
+
 /// A Game's symbol on its accent colour.
 struct GameSymbol: View {
     let game: Game
