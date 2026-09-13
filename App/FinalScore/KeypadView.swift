@@ -1,10 +1,31 @@
 import SwiftUI
 import FinalScoreCore
 
+/// What the keypad types into: the scorepad of a Rounds Match, or the Tally
+/// pad of a Tally Match. What each key does is theirs to decide, in Core.
+protocol KeypadTarget {
+    var match: Match { get }
+    var keypadText: String { get }
+    mutating func type(_ digit: Int)
+    mutating func deleteBackward()
+    mutating func toggleSign()
+    mutating func enterQuickScore(_ points: Int)
+    mutating func adjust(by delta: Int)
+    mutating func deselect()
+}
+
+extension Scorepad: KeypadTarget {}
+extension TallyPad: KeypadTarget {}
+
 /// The keypad Override — digits, sign and delete — with the Game's Quick scores
 /// above it and −1 / +1 beside it, all aimed at the selected Score.
-struct KeypadView: View {
-    @Binding var scorepad: Scorepad
+struct KeypadView<Target: KeypadTarget>: View {
+    @Binding var target: Target
+    /// Whose Score is being typed: "Grace · Round 2".
+    let title: String
+    /// The wide key under the digits, and what it does.
+    let nextTitle: String
+    let next: () -> Void
     @Environment(\.verticalSizeClass) private var verticalSizeClass
 
     /// Landscape phones have the height for four rows of keys, or for five
@@ -23,7 +44,7 @@ struct KeypadView: View {
     }
 
     private var quickScores: [Int] {
-        scorepad.match.game.quickScores
+        target.match.game.quickScores
     }
 
     var body: some View {
@@ -34,10 +55,10 @@ struct KeypadView: View {
                     .foregroundStyle(.secondary)
                     .lineLimit(1)
                 Spacer()
-                Text(scorepad.keypadText)
+                Text(target.keypadText)
                     .font(.title2.bold().monospacedDigit())
                     .accessibilityIdentifier("keypadDisplay")
-                Button("Hide Keypad", systemImage: "keyboard.chevron.compact.down") { scorepad.deselect() }
+                Button("Hide Keypad", systemImage: "keyboard.chevron.compact.down") { target.deselect() }
                     .labelStyle(.iconOnly)
                     .accessibilityIdentifier("hideKeypadButton")
             }
@@ -52,29 +73,29 @@ struct KeypadView: View {
                         }
                     }
                     GridRow {
-                        if scorepad.match.game.allowsNegative {
-                            key(Text("±"), identifier: "key.sign") { scorepad.toggleSign() }
+                        if target.match.game.allowsNegative {
+                            key(Text("±"), identifier: "key.sign") { target.toggleSign() }
                                 .accessibilityLabel("Change sign")
                         } else {
                             Color.clear.frame(height: keyHeight)
                         }
                         digitKey(0)
-                        key(Image(systemName: "delete.left"), identifier: "key.delete") { scorepad.deleteBackward() }
+                        key(Image(systemName: "delete.left"), identifier: "key.delete") { target.deleteBackward() }
                             .accessibilityLabel("Delete")
                     }
                 }
                 // Each spans two rows of digits: the keys most often tapped twice running.
                 VStack(spacing: spacing) {
-                    key(Text("+1"), identifier: "key.plusOne", fillsHeight: true) { scorepad.adjust(by: 1) }
+                    key(Text("+1"), identifier: "key.plusOne", fillsHeight: true) { target.adjust(by: 1) }
                         .accessibilityLabel("Add 1")
-                    key(Text("−1"), identifier: "key.minusOne", fillsHeight: true) { scorepad.adjust(by: -1) }
+                    key(Text("−1"), identifier: "key.minusOne", fillsHeight: true) { target.adjust(by: -1) }
                         .accessibilityLabel("Subtract 1")
                 }
                 .frame(width: adjustColumnWidth)
             }
             // As tall as the digits, which the ±1 column then stretches to fill.
             .fixedSize(horizontal: false, vertical: true)
-            Button { scorepad.next() } label: {
+            Button(action: next) {
                 Text(nextTitle)
                     .font(.headline)
                     .frame(maxWidth: .infinity, minHeight: keyHeight - 8)
@@ -84,23 +105,6 @@ struct KeypadView: View {
         }
         .padding(12)
         .background(.bar)
-    }
-
-    /// "Grace · Round 2"
-    private var title: String {
-        guard let selection = scorepad.selection,
-              let team = scorepad.match.teams.first(where: { $0.id == selection.team }),
-              let round = scorepad.match.number(of: selection.round)
-        else { return "" }
-        return "\(team.name) · Round \(round)"
-    }
-
-    private var nextTitle: String {
-        switch scorepad.nextStep {
-        case .nextTeam: "Next"
-        case .newRound: "New Round"
-        case .done: "Done"
-        }
     }
 
     /// The Game's Quick scores in the order it declares them, spread across the
@@ -120,7 +124,7 @@ struct KeypadView: View {
             ForEach(Array(quickScores.enumerated()), id: \.offset) { index, points in
                 // Drawn by hand rather than `.bordered`, whose padding would
                 // push even four short values into scrolling on a landscape keypad.
-                Button { scorepad.enterQuickScore(points) } label: {
+                Button { target.enterQuickScore(points) } label: {
                     Text("\(points)")
                         .font(.headline.monospacedDigit())
                         .padding(.horizontal, 6)
@@ -134,7 +138,7 @@ struct KeypadView: View {
     }
 
     private func digitKey(_ digit: Int) -> some View {
-        key(Text("\(digit)"), identifier: "key.\(digit)") { scorepad.type(digit) }
+        key(Text("\(digit)"), identifier: "key.\(digit)") { target.type(digit) }
     }
 
     private func key(

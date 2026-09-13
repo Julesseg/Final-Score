@@ -35,10 +35,14 @@ struct MatchListView: View {
             }
             .navigationDestination(for: Match.ID.self) { id in
                 if let match = library.match(id: id) {
-                    ScorepadView(match: Binding(
+                    let binding = Binding(
                         get: { library.match(id: id) ?? match },
                         set: { library.save($0) }
-                    ))
+                    )
+                    switch match.game.structure {
+                    case .rounds: ScorepadView(match: binding)
+                    case .tally: TallyView(match: binding)
+                    }
                 }
             }
             .sheet(isPresented: $isSettingUp) {
@@ -88,9 +92,11 @@ private struct MatchRow: View {
         .padding(.vertical, 2)
     }
 
-    /// "In progress · Round 3", "Finished · Grace wins"
+    /// "In progress · Round 3", "In progress" for a Tally, "Finished · Grace wins"
     private var status: String {
-        guard match.isEnded else { return "In progress · Round \(match.rounds.count)" }
+        guard match.isEnded else {
+            return match.game.structure == .rounds ? "In progress · Round \(match.rounds.count)" : "In progress"
+        }
         return ["Finished", match.outcomeText].compactMap(\.self).joined(separator: " · ")
     }
 }

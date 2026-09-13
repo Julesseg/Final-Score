@@ -313,6 +313,44 @@ final class FinalScoreUITests: XCTestCase {
         XCTAssertFalse(app.buttons["dealer.2"].exists)
     }
 
+    func testPointsTalliesWithPlusMinusAndTheKeypad() throws {
+        launch()
+        startMatch("Points", players: ["Ada", "Grace"])
+        scorePointsWithPlusMinusAndTheKeypad()
+        attachScreenshot(named: "Tally, portrait")
+
+        // A Score is corrected from the history, like any other.
+        app.buttons["history.4"].tap()
+        press("2", "0", "next")
+        XCTAssertEqual(total(1), "19")
+        attachScreenshot(named: "Tally history, portrait")
+
+        backToList()
+        let row = app.buttons["matchRow"]
+        XCTAssertTrue(row.waitForExistence(timeout: 5))
+        XCTAssertEqual(app.staticTexts["matchStatus"].label, "In progress", "A Tally has no Round to report")
+        row.tap()
+        XCTAssertTrue(app.staticTexts["total.1"].waitForExistence(timeout: 5), "A Tally Match reopens on the Tally view")
+        XCTAssertEqual(total(0), "3")
+        XCTAssertEqual(total(1), "19")
+    }
+
+    func testTallyingAndEndingPointsInLandscape() throws {
+        launch(in: .landscapeLeft)
+        startMatch("Points", players: ["Ada", "Grace", "Linus"])
+        scorePointsWithPlusMinusAndTheKeypad()
+        attachScreenshot(named: "Tally, landscape")
+
+        app.buttons["endMatchButton"].tap()
+        confirmEndMatch()
+
+        let outcome = element("outcome")
+        XCTAssertTrue(outcome.waitForExistence(timeout: 5))
+        XCTAssertTrue(outcome.label.contains("Grace wins"))
+        XCTAssertFalse(app.buttons["plus.0"].exists, "No Score is added to an ended Match")
+        attachScreenshot(named: "Tally ended, landscape")
+    }
+
     // MARK: Helpers
 
     /// Scores three Rounds of Skyjo, retypes a Score from the first and deletes
@@ -402,6 +440,42 @@ final class FinalScoreUITests: XCTestCase {
         return badge.value as? String
     }
 
+    /// Three +1 for Ada, a −1 then a keypad 12 for Grace, and no Round or
+    /// Dealer anywhere.
+    private func scorePointsWithPlusMinusAndTheKeypad() {
+        XCTAssertFalse(app.buttons["key.next"].exists, "A Tally opens with the keypad away")
+        XCTAssertFalse(app.buttons["newRoundButton"].exists)
+        XCTAssertFalse(app.buttons["score.1.0"].exists, "A Tally has no Rounds")
+        XCTAssertFalse(app.staticTexts.containing(NSPredicate(format: "label CONTAINS[c] 'Round' OR label CONTAINS[c] 'Dealer'")).firstMatch.exists)
+        XCTAssertEqual(total(0), "0")
+
+        tap("plus.0", "plus.0", "plus.0", "minus.1")
+        XCTAssertEqual(total(0), "3")
+        XCTAssertEqual(total(1), "-1")
+        XCTAssertTrue(app.images["leader.0"].exists, "Highest Total leads in Points")
+
+        tap("keypad.1")
+        press("1", "2")
+        XCTAssertEqual(total(1), "11", "The keypad lands its Score as typed")
+        press("next")
+        XCTAssertFalse(app.buttons["key.next"].exists, "Done puts the keypad away")
+
+        let history = app.buttons["history.4"]
+        XCTAssertFalse(history.exists, "The history sits behind a disclosure")
+        element("history").tap()
+        XCTAssertTrue(history.waitForExistence(timeout: 5))
+        XCTAssertEqual(history.value as? String, "+12")
+        XCTAssertEqual(app.buttons["history.3"].value as? String, "-1")
+    }
+
+    private func tap(_ identifiers: String...) {
+        for identifier in identifiers {
+            let button = app.buttons[identifier]
+            XCTAssertTrue(button.waitForExistence(timeout: 5), "No button \(identifier)")
+            button.tap()
+        }
+    }
+
     /// Tarot's Quick scores in order, one nudged by ±1, and the keypad taking
     /// over from another.
     private func scoreTarotWithQuickScores() {
@@ -474,7 +548,7 @@ final class FinalScoreUITests: XCTestCase {
 
     private func tapStart() {
         app.buttons["startMatchButton"].tap()
-        XCTAssertTrue(app.buttons["key.next"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.staticTexts["total.0"].waitForExistence(timeout: 5))
     }
 
     private func openSetup(_ game: String) {
