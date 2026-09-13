@@ -15,11 +15,11 @@ struct OneTeamPerRoundTests {
 
     // MARK: Match
 
-    @Test func choosingTheScorerGivesEveryOtherTeamAnExplicitZero() {
+    @Test func choosingTheScoringTeamGivesEveryOtherTeamAnExplicitZero() {
         var match = coincheMatch()
         let round = match.rounds[0].id
 
-        match.setScorer(match.teams[1].id, inRound: round)
+        match.setScoringTeam(match.teams[1].id, inRound: round)
 
         #expect(match.round(round)?.points(for: match.teams[0].id) == 0)
         #expect(match.round(round)?.points(for: match.teams[1].id) == 0)
@@ -29,7 +29,7 @@ struct OneTeamPerRoundTests {
     @Test func aRoundHoldsExactlyOneNonZeroScore() {
         var scorepad = Scorepad(match: coincheMatch())
 
-        scorepad.chooseScorer(scorepad.match.teams[1].id)
+        scorepad.chooseScoringTeam(scorepad.match.teams[1].id)
         scorepad.enterQuickScore(120)
 
         let round = scorepad.match.rounds[0]
@@ -38,34 +38,34 @@ struct OneTeamPerRoundTests {
         #expect(scorepad.match.total(for: scorepad.match.teams[1].id) == 120)
     }
 
-    @Test func choosingAnotherScorerTakesTheRoundFromTheFirst() {
+    @Test func choosingAnotherScoringTeamTakesTheRoundFromTheFirst() {
         var match = coincheMatch()
         let round = match.rounds[0].id
-        match.setScorer(match.teams[0].id, inRound: round)
+        match.setScoringTeam(match.teams[0].id, inRound: round)
         match.setScore(90, for: match.teams[0].id, inRound: round)
 
-        match.setScorer(match.teams[1].id, inRound: round)
+        match.setScoringTeam(match.teams[1].id, inRound: round)
 
         #expect(match.round(round)?.points(for: match.teams[0].id) == 0)
         #expect(match.round(round)?.points(for: match.teams[1].id) == 0)
     }
 
-    @Test func theScorerKeepsAScoreItAlreadyHas() {
+    @Test func theScoringTeamKeepsAScoreItAlreadyHas() {
         var match = coincheMatch()
         let round = match.rounds[0].id
         match.setScore(80, for: match.teams[1].id, inRound: round)
 
-        match.setScorer(match.teams[1].id, inRound: round)
+        match.setScoringTeam(match.teams[1].id, inRound: round)
 
         #expect(match.round(round)?.points(for: match.teams[1].id) == 80)
         #expect(match.round(round)?.points(for: match.teams[0].id) == 0)
     }
 
-    @Test func aGameWhereEveryoneScoresHasNoScorerToChoose() {
+    @Test func aGameWhereEveryoneScoresHasNoScoringTeamToChoose() {
         var match = Match(game: .belote, teams: coincheMatch().teams)
         let round = match.rounds[0].id
 
-        match.setScorer(match.teams[1].id, inRound: round)
+        match.setScoringTeam(match.teams[1].id, inRound: round)
 
         #expect(match.rounds[0].scores.isEmpty)
     }
@@ -75,18 +75,18 @@ struct OneTeamPerRoundTests {
     @Test func aNewRoundAsksWhoScoredBeforeTheKeypadOpens() {
         let scorepad = Scorepad(match: coincheMatch())
 
-        #expect(scorepad.roundAwaitingScorer == scorepad.match.rounds[0].id)
+        #expect(scorepad.roundAwaitingScoringTeam == scorepad.match.rounds[0].id)
         #expect(scorepad.selection == nil)
     }
 
-    @Test func choosingTheScorerOpensTheKeypadOnTheirScore() {
+    @Test func choosingTheScoringTeamOpensTheKeypadOnTheirScore() {
         var scorepad = Scorepad(match: coincheMatch())
         let grace = scorepad.match.teams[1].id
         let round = scorepad.match.rounds[0].id
 
-        scorepad.chooseScorer(grace)
+        scorepad.chooseScoringTeam(grace)
 
-        #expect(scorepad.roundAwaitingScorer == nil)
+        #expect(scorepad.roundAwaitingScoringTeam == nil)
         #expect(scorepad.selection == .init(round: round, team: grace))
         #expect(scorepad.keypadText == "0")
         scorepad.type(1)
@@ -95,9 +95,9 @@ struct OneTeamPerRoundTests {
         #expect(scorepad.match.total(for: grace) == 130, "The first digit replaces the placeholder 0")
     }
 
-    @Test func nextAfterTheScorerSkipsTheOtherTeamsAndAsksAboutTheNewRound() {
+    @Test func nextAfterTheScoringTeamSkipsTheOtherTeamsAndAsksAboutTheNewRound() {
         var scorepad = Scorepad(match: coincheMatch())
-        scorepad.chooseScorer(scorepad.match.teams[0].id)
+        scorepad.chooseScoringTeam(scorepad.match.teams[0].id)
         scorepad.enterQuickScore(100)
         #expect(scorepad.nextStep == .newRound, "Every other Team already holds its 0")
 
@@ -105,38 +105,53 @@ struct OneTeamPerRoundTests {
 
         #expect(scorepad.match.rounds.count == 2)
         #expect(scorepad.selection == nil)
-        #expect(scorepad.roundAwaitingScorer == scorepad.match.rounds[1].id)
+        #expect(scorepad.roundAwaitingScoringTeam == scorepad.match.rounds[1].id)
     }
 
     @Test func startingANewRoundAsksWhoScoredIt() {
         var scorepad = Scorepad(match: coincheMatch())
-        scorepad.chooseScorer(scorepad.match.teams[0].id)
+        scorepad.chooseScoringTeam(scorepad.match.teams[0].id)
 
         scorepad.startNewRound()
 
-        #expect(scorepad.roundAwaitingScorer == scorepad.match.rounds[1].id)
+        #expect(scorepad.roundAwaitingScoringTeam == scorepad.match.rounds[1].id)
         #expect(scorepad.selection == nil)
     }
 
-    @Test func tappingAScoreStillOverridesItWithoutAsking() {
+    @Test func tappingAScoreInARoundNobodyScoredChoosesThatTeam() {
         var scorepad = Scorepad(match: coincheMatch())
         let round = scorepad.match.rounds[0].id
-        let ada = scorepad.match.teams[0].id
+        let (ada, grace) = (scorepad.match.teams[0].id, scorepad.match.teams[1].id)
 
         scorepad.select(.init(round: round, team: ada))
         scorepad.type(2)
         scorepad.type(0)
 
-        #expect(scorepad.roundAwaitingScorer == nil)
+        #expect(scorepad.roundAwaitingScoringTeam == nil)
         #expect(scorepad.match.total(for: ada) == 20)
+        #expect(scorepad.match.round(round)?.points(for: grace) == 0)
+        #expect(!scorepad.match.totalsArePartial)
         #expect(scorepad.nextStep == .newRound)
+    }
+
+    @Test func afterHidingTheQuestionATappedScoreStillChoosesTheTeam() {
+        var scorepad = Scorepad(match: coincheMatch())
+        let round = scorepad.match.rounds[0].id
+        let grace = scorepad.match.teams[1].id
+        scorepad.deselect()
+
+        scorepad.select(.init(round: round, team: grace))
+        scorepad.enterQuickScore(110)
+
+        #expect(scorepad.match.round(round)?.scores.filter { $0.points != 0 } == [Score(team: grace, points: 110)])
+        #expect(scorepad.match.canStartNewRound)
     }
 
     @Test func anOverrideCanScoreASecondTeamInTheSameRound() {
         var scorepad = Scorepad(match: coincheMatch())
         let round = scorepad.match.rounds[0].id
         let (ada, grace) = (scorepad.match.teams[0].id, scorepad.match.teams[1].id)
-        scorepad.chooseScorer(ada)
+        scorepad.chooseScoringTeam(ada)
         scorepad.enterQuickScore(160)
 
         // Belote and rebelote held in defence still count for the other Team.
@@ -153,15 +168,15 @@ struct OneTeamPerRoundTests {
 
         scorepad.deselect()
 
-        #expect(scorepad.roundAwaitingScorer == nil)
+        #expect(scorepad.roundAwaitingScoringTeam == nil)
         #expect(scorepad.match.rounds[0].scores.isEmpty)
     }
 
-    @Test func choosingAScorerWithNoQuestionAskedDoesNothing() {
+    @Test func choosingAScoringTeamWithNoQuestionAskedDoesNothing() {
         var scorepad = Scorepad(match: coincheMatch())
         scorepad.deselect()
 
-        scorepad.chooseScorer(scorepad.match.teams[0].id)
+        scorepad.chooseScoringTeam(scorepad.match.teams[0].id)
 
         #expect(scorepad.selection == nil)
         #expect(scorepad.match.rounds[0].scores.isEmpty)
@@ -169,7 +184,7 @@ struct OneTeamPerRoundTests {
 
     @Test func deletingTheRoundBeingAskedAboutAsksAboutTheRoundInPlay() {
         var scorepad = Scorepad(match: coincheMatch())
-        scorepad.chooseScorer(scorepad.match.teams[0].id)
+        scorepad.chooseScoringTeam(scorepad.match.teams[0].id)
         scorepad.enterQuickScore(80)
         scorepad.startNewRound()
         let (first, second) = (scorepad.match.rounds[0].id, scorepad.match.rounds[1].id)
@@ -177,38 +192,38 @@ struct OneTeamPerRoundTests {
         scorepad.deleteRound(second)
 
         #expect(scorepad.match.rounds.map(\.id) == [first])
-        #expect(scorepad.roundAwaitingScorer == nil, "The Round left is already scored")
+        #expect(scorepad.roundAwaitingScoringTeam == nil, "The Round left is already scored")
         #expect(scorepad.selection == nil)
     }
 
     @Test func deletingTheOnlyRoundAsksAboutTheEmptyOneLeft() {
         var scorepad = Scorepad(match: coincheMatch())
-        scorepad.chooseScorer(scorepad.match.teams[0].id)
+        scorepad.chooseScoringTeam(scorepad.match.teams[0].id)
 
         scorepad.deleteRound(scorepad.match.rounds[0].id)
 
-        #expect(scorepad.roundAwaitingScorer == scorepad.match.rounds[0].id)
+        #expect(scorepad.roundAwaitingScoringTeam == scorepad.match.rounds[0].id)
     }
 
     @Test func endingTheMatchStopsAsking() {
         var scorepad = Scorepad(match: coincheMatch())
-        scorepad.chooseScorer(scorepad.match.teams[0].id)
+        scorepad.chooseScoringTeam(scorepad.match.teams[0].id)
         scorepad.enterQuickScore(90)
         scorepad.startNewRound()
 
         scorepad.endMatch()
 
-        #expect(scorepad.roundAwaitingScorer == nil)
+        #expect(scorepad.roundAwaitingScoringTeam == nil)
         #expect(scorepad.match.rounds.count == 1, "The Round nobody scored is dropped")
     }
 
     @Test func resumingAScoredRoundOpensWithNothingAsked() {
         var match = coincheMatch()
-        match.setScorer(match.teams[0].id, inRound: match.rounds[0].id)
+        match.setScoringTeam(match.teams[0].id, inRound: match.rounds[0].id)
 
         let scorepad = Scorepad(match: match)
 
-        #expect(scorepad.roundAwaitingScorer == nil)
+        #expect(scorepad.roundAwaitingScoringTeam == nil)
         #expect(scorepad.selection == nil)
     }
 
@@ -218,7 +233,7 @@ struct OneTeamPerRoundTests {
 
         let scorepad = Scorepad(match: match)
 
-        #expect(scorepad.roundAwaitingScorer == nil, "Someone already scored this Round")
+        #expect(scorepad.roundAwaitingScoringTeam == nil, "Someone already scored this Round")
         #expect(scorepad.selection == nil, "No other Team is waiting on a Score")
     }
 
@@ -226,6 +241,6 @@ struct OneTeamPerRoundTests {
         var match = coincheMatch()
         match.end()
 
-        #expect(Scorepad(match: match).roundAwaitingScorer == nil)
+        #expect(Scorepad(match: match).roundAwaitingScoringTeam == nil)
     }
 }

@@ -105,7 +105,7 @@ public struct Match: Codable, Hashable, Identifiable, Sendable {
     /// Team: every other Team gets an explicit 0, and this one keeps any Score
     /// it already has, or 0 until its points are entered. Does nothing in a
     /// Game where every Team scores.
-    public mutating func setScorer(_ team: Team.ID, inRound round: Round.ID) {
+    public mutating func setScoringTeam(_ team: Team.ID, inRound round: Round.ID) {
         guard game.scorers == .oneTeamPerRound,
               teams.contains(where: { $0.id == team }),
               let index = rounds.firstIndex(where: { $0.id == round })

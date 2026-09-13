@@ -621,14 +621,14 @@ final class FinalScoreUITests: XCTestCase {
         XCTAssertEqual(app.staticTexts["teamName.0"].label, "Ada & Linus")
         XCTAssertEqual(app.staticTexts["teamName.1"].label, "Grace & Marie")
 
-        let question = app.staticTexts["scorerQuestion"]
+        let question = app.staticTexts["scoringTeamQuestion"]
         XCTAssertTrue(question.waitForExistence(timeout: 5))
         XCTAssertEqual(question.label, "Who scored Round 1?")
         XCTAssertFalse(app.buttons["key.next"].exists, "The keypad waits for a Team")
         attachScreenshot(named: "Coinche asks who scored, \(orientationName)")
 
         // Grace & Marie made an 80 contract.
-        tap("scorer.1")
+        tap("scoringTeam.1")
         XCTAssertTrue(app.buttons["key.next"].waitForExistence(timeout: 5))
         XCTAssertFalse(question.exists)
         XCTAssertEqual(app.buttons["quickScore.0"].label, "80", "The contracts are the Quick scores")
@@ -638,7 +638,7 @@ final class FinalScoreUITests: XCTestCase {
         XCTAssertEqual(app.buttons["score.1.0"].value as? String, "0", "The other Team scores 0 untouched")
         XCTAssertFalse(app.staticTexts["partialTotalsNotice"].exists, "The Round is fully scored")
         XCTAssertEqual(total(1), "80")
-        attachScreenshot(named: "Coinche keypad on the scorer, \(orientationName)")
+        attachScreenshot(named: "Coinche keypad on the scoring Team, \(orientationName)")
 
         // Next skips the Team already on 0 and asks about Round 2.
         XCTAssertEqual(app.buttons["key.next"].label, "New Round")
@@ -646,8 +646,11 @@ final class FinalScoreUITests: XCTestCase {
         XCTAssertTrue(question.waitForExistence(timeout: 5))
         XCTAssertEqual(question.label, "Who scored Round 2?")
 
-        // Ada & Linus, 130.
-        tap("scorer.0")
+        // Put away unanswered, the question is still answered by tapping a
+        // Score: Ada & Linus, 130.
+        tap("hideScoringTeamButton")
+        XCTAssertTrue(question.waitForNonExistence(timeout: 5))
+        tap("score.2.0")
         press("1", "3", "0")
         XCTAssertEqual(total(0), "130")
         XCTAssertEqual(app.buttons["score.2.1"].value as? String, "0")

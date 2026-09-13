@@ -27,7 +27,7 @@ struct ScorepadView: View {
                         MatchBanner(match: scorepad.match) { isConfirmingEnd = true }
                         grid
                     }
-                    if let entry {
+                    if showsEntry {
                         Divider()
                         entry
                             .frame(width: 280)
@@ -37,7 +37,7 @@ struct ScorepadView: View {
                 VStack(spacing: 0) {
                     MatchBanner(match: scorepad.match) { isConfirmingEnd = true }
                     grid
-                    if let entry {
+                    if showsEntry {
                         Divider()
                         entry
                     }
@@ -90,10 +90,17 @@ struct ScorepadView: View {
 
     /// What sits under the grid, or beside it in landscape: the keypad, the
     /// question of who scored, or nothing.
-    private var entry: AnyView? {
-        if scorepad.selection != nil { return AnyView(keypad) }
-        if let round = scorepad.roundAwaitingScorer { return AnyView(scorerPicker(for: round)) }
-        return nil
+    @ViewBuilder
+    private var entry: some View {
+        if scorepad.selection != nil {
+            keypad
+        } else if let round = scorepad.roundAwaitingScoringTeam {
+            scoringTeamPicker(for: round)
+        }
+    }
+
+    private var showsEntry: Bool {
+        scorepad.selection != nil || scorepad.roundAwaitingScoringTeam != nil
     }
 
     private var keypad: some View {
@@ -110,7 +117,7 @@ struct ScorepadView: View {
     }
 
     /// One button per Team; picking one opens the keypad on its Score.
-    private func scorerPicker(for round: Round.ID) -> some View {
+    private func scoringTeamPicker(for round: Round.ID) -> some View {
         let isCompact = verticalSizeClass == .compact
         return VStack(spacing: isCompact ? 6 : 8) {
             HStack {
@@ -118,11 +125,11 @@ struct ScorepadView: View {
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
                     .lineLimit(1)
-                    .accessibilityIdentifier("scorerQuestion")
+                    .accessibilityIdentifier("scoringTeamQuestion")
                 Spacer()
                 Button("Hide", systemImage: "chevron.down") { scorepad.deselect() }
                     .labelStyle(.iconOnly)
-                    .accessibilityIdentifier("hideScorerButton")
+                    .accessibilityIdentifier("hideScoringTeamButton")
             }
             // Side by side under the grid; stacked in the narrow landscape panel.
             ScrollView {
@@ -131,7 +138,7 @@ struct ScorepadView: View {
                     spacing: 8
                 ) {
                     ForEach(Array(teams.enumerated()), id: \.element.id) { index, team in
-                        Button { scorepad.chooseScorer(team.id) } label: {
+                        Button { scorepad.chooseScoringTeam(team.id) } label: {
                             Text(team.name)
                                 .font(.headline)
                                 .lineLimit(2)
@@ -139,7 +146,7 @@ struct ScorepadView: View {
                                 .frame(maxWidth: .infinity, minHeight: isCompact ? 44 : 56)
                         }
                         .buttonStyle(.bordered)
-                        .accessibilityIdentifier("scorer.\(index)")
+                        .accessibilityIdentifier("scoringTeam.\(index)")
                     }
                 }
             }
