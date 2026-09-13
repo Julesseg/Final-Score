@@ -182,6 +182,12 @@ public struct Match: Codable, Hashable, Identifiable, Sendable {
         return zip(teams, totals).filter { $0.1 == best }.map(\.0)
     }
 
+    /// The best Total under the Game's Direction, shared by every leader; nil
+    /// before the first Score.
+    public var leadingTotal: Int? {
+        leaders.first.map { total(for: $0.id) }
+    }
+
     /// Whether some, but not all, Teams have a Score in this Round.
     public func isPartlyFilled(_ round: Round) -> Bool {
         let scored = teams.count - unscoredTeams(in: round).count

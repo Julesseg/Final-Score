@@ -38,7 +38,7 @@ final class FinalScoreUITests: XCTestCase {
 
         let row = app.buttons["matchRow"]
         XCTAssertTrue(row.waitForExistence(timeout: 5))
-        XCTAssertTrue(app.staticTexts["matchStatus"].label.hasPrefix("In progress"))
+        XCTAssertEqual(app.staticTexts["matchStatus"].label, "Round 2 · Grace leads 0", "Lowest Total leads in Skyjo")
 
         row.tap()
 
@@ -228,8 +228,7 @@ final class FinalScoreUITests: XCTestCase {
         XCTAssertTrue(rows.element(boundBy: 1).waitForExistence(timeout: 5))
         XCTAssertTrue(rows.element(boundBy: 0).label.contains("Linus"), "In progress is listed above finished")
         XCTAssertTrue(rows.element(boundBy: 1).label.contains("Ada"))
-        XCTAssertTrue(rows.element(boundBy: 1).label.contains("Finished"))
-        XCTAssertTrue(rows.element(boundBy: 1).label.contains("Grace wins"))
+        XCTAssertTrue(rows.element(boundBy: 1).label.contains("Grace won · 9"))
 
         // Listed below, but still the last Match started: its Players come picked.
         openSetup("Skyjo")
@@ -270,8 +269,7 @@ final class FinalScoreUITests: XCTestCase {
         backToList()
         let row = app.buttons["matchRow"]
         XCTAssertTrue(row.waitForExistence(timeout: 5))
-        XCTAssertTrue(row.label.contains("Finished"))
-        XCTAssertTrue(row.label.contains("Linus wins"))
+        XCTAssertTrue(row.label.contains("Linus won · 4"))
         attachScreenshot(named: "Match list, landscape")
     }
 
@@ -329,7 +327,7 @@ final class FinalScoreUITests: XCTestCase {
         backToList()
         let row = app.buttons["matchRow"]
         XCTAssertTrue(row.waitForExistence(timeout: 5))
-        XCTAssertEqual(app.staticTexts["matchStatus"].label, "In progress", "A Tally has no Round to report")
+        XCTAssertEqual(app.staticTexts["matchStatus"].label, "Grace leads 19", "A Tally has no Round to report")
         row.tap()
         XCTAssertTrue(app.staticTexts["total.1"].waitForExistence(timeout: 5), "A Tally Match reopens on the Tally view")
         XCTAssertEqual(total(0), "3")
@@ -352,7 +350,88 @@ final class FinalScoreUITests: XCTestCase {
         attachScreenshot(named: "Tally ended, landscape")
     }
 
+    func testFirstLaunchOffersTheGamesAndACardStartsItsSetup() throws {
+        launch()
+        startSetupFromAGameCard("Tarot")
+    }
+
+    func testFirstLaunchWorksInLandscape() throws {
+        launch(in: .landscapeLeft)
+        startSetupFromAGameCard("Skyjo")
+    }
+
+    func testMatchRowsShowTheStandingOrTheWinnerAndHandleTies() throws {
+        launch()
+        listATiedMatchInPlayAndATiedFinishedOne()
+        attachScreenshot(named: "Match list, portrait")
+    }
+
+    func testMatchRowsWorkInLandscape() throws {
+        launch(in: .landscapeLeft)
+        listATiedMatchInPlayAndATiedFinishedOne()
+        attachScreenshot(named: "Match list with ties, landscape")
+    }
+
     // MARK: Helpers
+
+    /// With no Matches, every built-in Game is a card, New Match sits at the
+    /// bottom, and a card opens setup straight on its Game's Players.
+    private func startSetupFromAGameCard(_ game: String) {
+        for name in ["Tarot", "Rami", "Skyjo", "Scrabble", "Points"] {
+            XCTAssertTrue(app.buttons["gameCard.\(name)"].waitForExistence(timeout: 10), "No card for \(name)")
+        }
+        XCTAssertFalse(app.buttons["matchRow"].exists)
+        assertNewMatchIsPinnedToTheBottom()
+        attachScreenshot(named: "First launch, \(XCUIDevice.shared.orientation.isLandscape ? "landscape" : "portrait")")
+
+        app.buttons["gameCard.\(game)"].tap()
+
+        XCTAssertTrue(app.navigationBars[game].waitForExistence(timeout: 5), "Setup opens on \(game)")
+        XCTAssertTrue(app.textFields["newPlayerName"].waitForExistence(timeout: 5))
+        pickPlayers(["Ada", "Grace", "Linus"])
+        tapStart()
+
+        backToList()
+        XCTAssertTrue(app.buttons["matchRow"].waitForExistence(timeout: 5))
+        XCTAssertFalse(app.buttons["gameCard.\(game)"].exists, "The cards give way to the Match list")
+        assertNewMatchIsPinnedToTheBottom()
+    }
+
+    /// A Match tied in play above a Match that ended tied, each row saying so.
+    private func listATiedMatchInPlayAndATiedFinishedOne() {
+        startMatch("Skyjo", players: ["Linus", "Marie"])
+        press("3", "next", "3", "next")
+        app.buttons["endMatchButton"].tap()
+        confirmEndMatch()
+        XCTAssertTrue(element("outcome").waitForExistence(timeout: 5))
+        backToList()
+
+        startMatch("Skyjo", players: ["Ada", "Grace"])
+        press("5", "next", "5")
+        backToList()
+
+        let today = Date.now.formatted(date: .abbreviated, time: .omitted)
+        let rows = app.buttons.matching(identifier: "matchRow")
+        XCTAssertTrue(rows.element(boundBy: 1).waitForExistence(timeout: 5))
+        let statuses = app.staticTexts.matching(identifier: "matchStatus")
+        XCTAssertEqual(statuses.element(boundBy: 0).label, "Round 1 · Ada and Grace tied on 5")
+        XCTAssertEqual(statuses.element(boundBy: 1).label, "Linus and Marie tied · 3")
+        XCTAssertTrue(rows.element(boundBy: 1).label.contains("Skyjo"))
+        XCTAssertTrue(
+            rows.element(boundBy: 1).label.contains(today),
+            "A finished Match shows the day it ended"
+        )
+        XCTAssertFalse(rows.element(boundBy: 0).label.contains(today), "A Match in play shows no date")
+        assertNewMatchIsPinnedToTheBottom()
+    }
+
+    private func assertNewMatchIsPinnedToTheBottom() {
+        let newMatch = app.buttons["newMatchButton"]
+        XCTAssertTrue(newMatch.waitForExistence(timeout: 5))
+        XCTAssertTrue(newMatch.isHittable)
+        let window = app.windows.firstMatch.frame
+        XCTAssertGreaterThan(newMatch.frame.minY, window.maxY - 120, "New Match sits at the bottom, within thumb reach")
+    }
 
     /// Scores three Rounds of Skyjo, retypes a Score from the first and deletes
     /// the second, checking the Totals, the leader and the Round numbers.
@@ -532,7 +611,11 @@ final class FinalScoreUITests: XCTestCase {
     /// Opens the Game's setup with exactly these Players picked, in this order.
     private func setUpMatch(_ game: String, players: [String]) {
         openSetup(game)
+        pickPlayers(players)
+    }
 
+    /// Picks exactly these Players, in this order, on the setup already open.
+    private func pickPlayers(_ players: [String]) {
         // Unpick whoever the last Match left picked but isn't playing this one.
         // Identifiers are read up front: the query shrinks with every unpick.
         let picked = app.buttons

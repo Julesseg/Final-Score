@@ -44,6 +44,24 @@ extension Match {
         standing.map { $0.text(wins: "would win", tie: "would tie") }
     }
 
+    /// The Match list's line about a Match: "Round 7 · Marie leads 340" or
+    /// "Round 7 · Ada and Marie tied on 340" while in play, "Marie won · 501"
+    /// or "Ada and Marie tied · 501" once ended.
+    var statusText: String {
+        if isEnded {
+            guard let outcome, let leadingTotal else { return "Ended before any Score" }
+            return "\(outcome.text(wins: "won", tie: "tied")) · \(leadingTotal)"
+        }
+        var parts: [String] = []
+        if game.structure == .rounds {
+            parts.append("Round \(rounds.count)")
+        }
+        if let standing, let leadingTotal {
+            parts.append("\(standing.text(wins: "leads", tie: "tied on")) \(leadingTotal)")
+        }
+        return parts.isEmpty ? "No Scores yet" : parts.joined(separator: " · ")
+    }
+
     /// What the End condition says, once reached: "A Total reached 100".
     var endConditionText: String? {
         switch game.endCondition {

@@ -7,14 +7,23 @@ struct NewMatchView: View {
     /// The most recent Match, whose Players come pre-picked.
     let previous: Match?
     let onStart: (Match) -> Void
+    /// The Game picked, once past the list of Games.
+    @State private var path: [Game]
     @Environment(\.dismiss) private var dismiss
 
+    /// Opens on the `game`'s Players when it is already chosen, with the list
+    /// of Games still one step back.
+    init(roster: PlayerLibrary, previous: Match?, game: Game? = nil, onStart: @escaping (Match) -> Void) {
+        self.roster = roster
+        self.previous = previous
+        self.onStart = onStart
+        _path = State(initialValue: game.map { [$0] } ?? [])
+    }
+
     var body: some View {
-        NavigationStack {
+        NavigationStack(path: $path) {
             List(Game.builtIns, id: \.name) { game in
-                NavigationLink {
-                    PlayersView(game: game, roster: roster, previous: previous, onStart: onStart)
-                } label: {
+                NavigationLink(value: game) {
                     HStack(spacing: 12) {
                         GameSymbol(game: game)
                         VStack(alignment: .leading, spacing: 2) {
@@ -30,6 +39,9 @@ struct NewMatchView: View {
             }
             .navigationTitle("Choose a Game")
             .navigationBarTitleDisplayMode(.inline)
+            .navigationDestination(for: Game.self) { game in
+                PlayersView(game: game, roster: roster, previous: previous, onStart: onStart)
+            }
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Cancel") { dismiss() }
