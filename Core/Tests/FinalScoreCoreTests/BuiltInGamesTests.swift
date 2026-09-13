@@ -64,13 +64,27 @@ struct BuiltInGamesTests {
         #expect(scrabble.isBuiltIn)
     }
 
-    @Test func theCatalogueOffersTheFourIndividualRoundsGames() {
-        #expect(Game.builtIns.map(\.name) == ["Tarot", "Rami", "Skyjo", "Scrabble"])
+    @Test func pointsIsTheGenericTallyForAnyBoardGame() {
+        let points = Game.points
+        #expect(points.name == "Points")
+        #expect(points.structure == .tally)
+        #expect(points.teamPlay == .individual)
+        #expect(points.playerCount == 2...8)
+        #expect(points.direction == .highWins)
+        #expect(points.endCondition == .none, "A generic counter has no target of its own")
+        #expect(points.quickScores.isEmpty)
+        #expect(points.allowsNegative, "Points are taken away as well as added")
+        #expect(points.scorers == .everyone)
+        #expect(!points.tracksDealer, "A Tally has no Rounds to deal")
+        #expect(points.isBuiltIn)
+    }
+
+    @Test func theCatalogueOffersTheFourRoundsGamesThenPoints() {
+        #expect(Game.builtIns.map(\.name) == ["Tarot", "Rami", "Skyjo", "Scrabble", "Points"])
     }
 
     @Test(arguments: Game.builtIns)
-    func everyBuiltInIsAnIndividualRoundsGameWithAnIdentity(game: Game) {
-        #expect(game.structure == .rounds)
+    func everyBuiltInIsAnIndividualGameWithAnIdentity(game: Game) {
         #expect(game.teamPlay == .individual)
         #expect(game.scorers == .everyone)
         #expect(!game.symbol.isEmpty)

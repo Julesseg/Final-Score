@@ -1,6 +1,6 @@
 import Foundation
 
-/// A Team's points for one Round.
+/// A Team's points for one Round, or one increment within a Tally.
 public struct Score: Codable, Hashable, Sendable {
     public var team: Team.ID
     public var points: Int
@@ -53,13 +53,18 @@ public struct Match: Codable, Hashable, Identifiable, Sendable {
     /// Where everyone sits and which way the deal passes; nil in a Game that
     /// doesn't track the Dealer.
     public let seating: Seating?
+    /// Always empty in a Tally Match.
     public private(set) var rounds: [Round]
+    /// The Scores of a Tally Match, in the order they were recorded. Always
+    /// empty in a Rounds Match.
+    public private(set) var tallyScores: [Score]
     /// When the user ended the Match; nil while it is in play. The only thing
     /// stored about the end — the Winner is always derived from the Totals.
     public private(set) var endedAt: Date?
 
-    /// A new Match opens on an empty first Round, ready to score, dealt by the
-    /// first seat when there is a `seating`.
+    /// A new Rounds Match opens on an empty first Round, ready to score, dealt
+    /// by the first seat when there is a `seating`; a new Tally Match on every
+    /// Total at 0.
     public init(
         id: UUID = UUID(),
         startedAt: Date = Date(),
@@ -72,7 +77,22 @@ public struct Match: Codable, Hashable, Identifiable, Sendable {
         self.game = game
         self.teams = teams
         self.seating = seating
-        self.rounds = [Round(dealer: seating?.order.first)]
+        self.rounds = game.structure == .rounds ? [Round(dealer: seating?.order.first)] : []
+        self.tallyScores = []
+    }
+
+    /// Snapshots saved before Tallies existed have no `tallyScores`, and ones
+    /// saved before the Dealer was tracked have no `seating`.
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        id = try container.decode(UUID.self, forKey: .id)
+        startedAt = try container.decode(Date.self, forKey: .startedAt)
+        game = try container.decode(Game.self, forKey: .game)
+        teams = try container.decode([Team].self, forKey: .teams)
+        seating = try container.decodeIfPresent(Seating.self, forKey: .seating)
+        rounds = try container.decode([Round].self, forKey: .rounds)
+        tallyScores = try container.decodeIfPresent([Score].self, forKey: .tallyScores) ?? []
+        endedAt = try container.decodeIfPresent(Date.self, forKey: .endedAt)
     }
 
     /// Records a Team's points for a Round, replacing any Score already there.
@@ -107,9 +127,10 @@ public struct Match: Codable, Hashable, Identifiable, Sendable {
     }
 
     /// A new Round is offered once the last one has at least one Score, so the
-    /// scorepad never stacks up empty rows.
+    /// scorepad never stacks up empty rows. Never in a Tally.
     public var canStartNewRound: Bool {
-        rounds.last.map { !$0.scores.isEmpty } ?? true
+        guard game.structure == .rounds else { return false }
+        return rounds.last.map { !$0.scores.isEmpty } ?? true
     }
 
     /// Moves on to a new Round, dealt by the seat after the last Round's
@@ -126,8 +147,10 @@ public struct Match: Codable, Hashable, Identifiable, Sendable {
     /// Takes a misdealt Round off the scorepad, Scores and all. Round numbers
     /// come from position, so the Rounds after it close up. A Match is never
     /// without a Round: deleting the only one leaves an empty one to score,
-    /// dealt again by the same Dealer.
+    /// dealt again by the same Dealer. A Round the Match doesn't have, as in a
+    /// Tally, deletes nothing.
     public mutating func deleteRound(_ id: Round.ID) {
+        guard rounds.contains(where: { $0.id == id }) else { return }
         let dealer = rounds.first { $0.id == id }?.dealer
         rounds.removeAll { $0.id == id }
         if rounds.isEmpty {
@@ -135,19 +158,22 @@ public struct Match: Codable, Hashable, Identifiable, Sendable {
         }
     }
 
-    /// The Team's Scores summed across every Round. Derived, never stored.
+    /// The Team's Scores summed across every Round, or across its Tally.
+    /// Derived, never stored.
     public func total(for team: Team.ID) -> Int {
         total(for: team, in: rounds)
     }
 
+    /// The Team's Total counting only these Rounds, and the whole Tally.
     private func total(for team: Team.ID, in rounds: [Round]) -> Int {
         rounds.reduce(0) { $0 + ($1.points(for: team) ?? 0) }
+            + tallyScores.reduce(0) { $0 + ($1.team == team ? $1.points : 0) }
     }
 
     /// The Teams whose Total is best under the Game's Direction — several when
     /// level, none before the first Score.
     public var leaders: [Team] {
-        guard rounds.contains(where: { !$0.scores.isEmpty }) else { return [] }
+        guard !tallyScores.isEmpty || rounds.contains(where: { !$0.scores.isEmpty }) else { return [] }
         let totals = teams.map { total(for: $0.id) }
         let best = switch game.direction {
         case .highWins: totals.max()
@@ -179,11 +205,41 @@ public struct Match: Codable, Hashable, Identifiable, Sendable {
         }
     }
 
+    // MARK: Tally
+
+    /// Records a Score in a Tally Match: points added to the Team's Total, or
+    /// taken from it when negative. Does nothing in a Rounds Match.
+    public mutating func recordTallyScore(_ points: Int, for team: Team.ID) {
+        guard game.structure == .tally else { return }
+        tallyScores.append(Score(team: team, points: points))
+    }
+
+    /// Corrects the points of a Score already recorded.
+    public mutating func setTallyScore(_ points: Int, at index: Int) {
+        guard tallyScores.indices.contains(index) else { return }
+        tallyScores[index].points = points
+    }
+
+    /// Takes a recorded Score out of the Tally, and so out of its Team's Total.
+    public mutating func removeTallyScore(at index: Int) {
+        guard tallyScores.indices.contains(index) else { return }
+        tallyScores.remove(at: index)
+    }
+
+    /// The Team's Total just after this Score was recorded; nil if there is no
+    /// such Score.
+    public func totalAfterTallyScore(at index: Int) -> Int? {
+        guard tallyScores.indices.contains(index) else { return nil }
+        let team = tallyScores[index].team
+        return tallyScores[...index].reduce(0) { $0 + ($1.team == team ? $1.points : 0) }
+    }
+
     // MARK: Ending
 
     /// Whether the Game's End condition says the Match has run its course. Only
     /// fully scored Rounds count, so a Round still being entered neither
-    /// triggers it early nor hides it once reached. Announced, never enforced:
+    /// triggers it early nor hides it once reached; every Score of a Tally
+    /// counts, and a Tally never reaches a Round count. Announced, never enforced:
     /// scoring past it stays possible.
     public var endConditionIsReached: Bool {
         let fullyScored = rounds.filter { unscoredTeams(in: $0).isEmpty }

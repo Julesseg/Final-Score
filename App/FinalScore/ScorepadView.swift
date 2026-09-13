@@ -22,22 +22,22 @@ struct ScorepadView: View {
             if verticalSizeClass == .compact {
                 HStack(spacing: 0) {
                     VStack(spacing: 0) {
-                        banner
+                        MatchBanner(match: scorepad.match) { isConfirmingEnd = true }
                         grid
                     }
                     if scorepad.selection != nil {
                         Divider()
-                        KeypadView(scorepad: $scorepad)
+                        keypad
                             .frame(width: 280)
                     }
                 }
             } else {
                 VStack(spacing: 0) {
-                    banner
+                    MatchBanner(match: scorepad.match) { isConfirmingEnd = true }
                     grid
                     if scorepad.selection != nil {
                         Divider()
-                        KeypadView(scorepad: $scorepad)
+                        keypad
                     }
                 }
             }
@@ -84,45 +84,26 @@ struct ScorepadView: View {
         return zeroes + "Scores can still be corrected afterwards."
     }
 
-    // MARK: Banner
+    // MARK: Keypad
 
-    /// Once ended, the Winner; before that, the End condition's announcement
-    /// once it is reached. Never in the way of scoring.
-    @ViewBuilder
-    private var banner: some View {
-        let match = scorepad.match
-        if match.isEnded {
-            Label(match.outcomeText ?? "Match ended", systemImage: "trophy.fill")
-                .font(.headline)
-                .foregroundStyle(.tint)
-                .frame(maxWidth: .infinity)
-                .accessibilityElement(children: .combine)
-                .accessibilityIdentifier("outcome")
-                .modifier(BannerStyle(isCompact: verticalSizeClass == .compact))
-        } else if match.endConditionIsReached, let reason = match.endConditionText {
-            HStack(spacing: 12) {
-                Image(systemName: "flag.checkered")
-                    .font(.title3)
-                    .foregroundStyle(.tint)
-                    .accessibilityHidden(true)
-                VStack(alignment: .leading, spacing: 0) {
-                    Text(reason)
-                        .font(.subheadline.bold())
-                    if let standing = match.standingText {
-                        Text(standing)
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                    }
-                }
-                .accessibilityElement(children: .combine)
-                .accessibilityIdentifier("endConditionNotice")
-                Spacer(minLength: 8)
-                Button("End Match") { isConfirmingEnd = true }
-                    .buttonStyle(.borderedProminent)
-                    .controlSize(.small)
-                    .accessibilityIdentifier("endMatchFromNotice")
-            }
-            .modifier(BannerStyle(isCompact: verticalSizeClass == .compact))
+    private var keypad: some View {
+        KeypadView(target: $scorepad, title: keypadTitle, nextTitle: nextTitle) { scorepad.next() }
+    }
+
+    /// "Grace · Round 2"
+    private var keypadTitle: String {
+        guard let selection = scorepad.selection,
+              let team = teams.first(where: { $0.id == selection.team }),
+              let round = scorepad.match.number(of: selection.round)
+        else { return "" }
+        return "\(team.name) · Round \(round)"
+    }
+
+    private var nextTitle: String {
+        switch scorepad.nextStep {
+        case .nextTeam: "Next"
+        case .newRound: "New Round"
+        case .done: "Done"
         }
     }
 
@@ -318,18 +299,5 @@ struct ScorepadView: View {
         }
         .padding(.vertical, 10)
         .frame(maxWidth: .infinity, alignment: .leading)
-    }
-}
-
-/// A full-width strip across the top of the scorepad, slimmer in landscape.
-private struct BannerStyle: ViewModifier {
-    let isCompact: Bool
-
-    func body(content: Content) -> some View {
-        content
-            .padding(.horizontal)
-            .padding(.vertical, isCompact ? 6 : 10)
-            .background(.tint.opacity(0.12))
-            .transition(.move(edge: .top).combined(with: .opacity))
     }
 }

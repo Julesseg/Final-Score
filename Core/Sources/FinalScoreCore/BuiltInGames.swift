@@ -2,7 +2,7 @@ import Foundation
 
 extension Game {
     /// The Games that ship with the app, in the order the Game picker lists them.
-    public static let builtIns: [Game] = [.tarot, .rami, .skyjo, .scrabble]
+    public static let builtIns: [Game] = [.tarot, .rami, .skyjo, .scrabble, .points]
 
     public static let tarot = Game(
         name: "Tarot",
@@ -61,6 +61,23 @@ extension Game {
         structure: .rounds,
         teamPlay: .individual,
         playerCount: 2...4,
+        direction: .highWins,
+        endCondition: .none,
+        quickScores: [],
+        allowsNegative: true,
+        scorers: .everyone,
+        tracksDealer: false,
+        isBuiltIn: true
+    )
+
+    /// The generic counter for any board game: a Tally rather than Rounds.
+    public static let points = Game(
+        name: "Points",
+        symbol: "plusminus",
+        accent: .orange,
+        structure: .tally,
+        teamPlay: .individual,
+        playerCount: 2...8,
         direction: .highWins,
         endCondition: .none,
         quickScores: [],
