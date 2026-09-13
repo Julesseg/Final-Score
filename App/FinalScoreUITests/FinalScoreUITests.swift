@@ -299,6 +299,18 @@ final class FinalScoreUITests: XCTestCase {
         attachScreenshot(named: "Dealer, landscape")
     }
 
+    func testSettingUpABeloteMatchComposesTeamsAndScoresARound() throws {
+        launch()
+        composeBeloteTeamsAndScoreARound()
+        attachScreenshot(named: "Belote scorepad, portrait")
+    }
+
+    func testBeloteTeamsWorkInLandscape() throws {
+        launch(in: .landscapeLeft)
+        composeBeloteTeamsAndScoreARound()
+        attachScreenshot(named: "Belote scorepad, landscape")
+    }
+
     func testAGameThatDoesNotTrackTheDealerShowsNone() throws {
         launch()
         setUpMatch("Scrabble", players: ["Ada", "Grace"])
@@ -505,6 +517,81 @@ final class FinalScoreUITests: XCTestCase {
 
         XCTAssertEqual(dealer(inRound: 3), "Ada", "The deal passes on from whoever was handed it")
         XCTAssertEqual(dealer(inRound: 1), "Ada", "Earlier Rounds keep their Dealer")
+    }
+
+    /// Belote, the first Game whose Teams hold more than one Player: four seats
+    /// compose two Teams, a swap changes them, and the scorepad scores the Teams
+    /// while the deal still passes Player by Player.
+    private func composeBeloteTeamsAndScoreARound() {
+        setUpMatch("Belote", players: ["Ada", "Grace", "Linus", "Marie"])
+        dismissNameField()
+
+        // Seats alternate, so partners sit across the table from each other.
+        XCTAssertEqual(seat(team: 0, slot: 0).label, "Ada")
+        XCTAssertEqual(seat(team: 0, slot: 1).label, "Linus")
+        XCTAssertEqual(seat(team: 1, slot: 0).label, "Grace")
+        XCTAssertEqual(seat(team: 1, slot: 1).label, "Marie")
+        attachScreenshot(named: "Belote setup, \(orientationName)")
+
+        // Ada would rather play with Grace: swapping their seats changes both Teams.
+        bringIntoReach(seat(team: 0, slot: 1)).tap()
+        let swap = app.buttons["Swap with Grace"]
+        XCTAssertTrue(swap.waitForExistence(timeout: 5))
+        swap.tap()
+        XCTAssertEqual(seat(team: 0, slot: 1).label, "Grace")
+        XCTAssertEqual(seat(team: 1, slot: 0).label, "Linus")
+
+        tapStart()
+
+        // Two columns, one per Team, labelled with their Players.
+        XCTAssertTrue(app.staticTexts["teamName.0"].waitForExistence(timeout: 5))
+        XCTAssertEqual(app.staticTexts["teamName.0"].label, "Ada & Grace")
+        XCTAssertEqual(app.staticTexts["teamName.1"].label, "Linus & Marie")
+        XCTAssertFalse(app.staticTexts["teamName.2"].exists, "Four Players make two columns, not four")
+        XCTAssertFalse(app.buttons["key.sign"].exists, "A Belote Team never scores below 0")
+
+        // A Round splits its 162 points between the two Teams.
+        press("9", "1", "next", "7", "1")
+
+        XCTAssertEqual(total(0), "91")
+        XCTAssertEqual(total(1), "71")
+        XCTAssertTrue(app.images["leader.0"].exists, "Highest Total leads in Belote")
+
+        hideKeypad()
+        XCTAssertEqual(dealer(inRound: 1), "Ada", "Seat 1 deals first")
+
+        app.buttons["newRoundButton"].tap()
+        hideKeypad()
+        XCTAssertEqual(dealer(inRound: 2), "Linus", "The deal passes to seat 2 — a Player on the other Team")
+    }
+
+    /// The Add Player field stays open for the next name; an empty submit puts
+    /// it and the keyboard away, so the rest of the form is in reach.
+    private func dismissNameField() {
+        let field = app.textFields["newPlayerName"]
+        guard field.exists else { return }
+        field.typeText("\n")
+        XCTAssertTrue(field.waitForNonExistence(timeout: 5))
+    }
+
+    private func seat(team: Int, slot: Int) -> XCUIElement {
+        let menu = app.buttons["teamSeat.\(team).\(slot)"]
+        XCTAssertTrue(menu.waitForExistence(timeout: 5), "No seat \(slot) on Team \(team + 1)")
+        return menu
+    }
+
+    /// Scrolls a Form down until the element can be tapped.
+    @discardableResult
+    private func bringIntoReach(_ element: XCUIElement) -> XCUIElement {
+        for _ in 0..<4 where !element.isHittable {
+            app.swipeUp()
+        }
+        XCTAssertTrue(element.isHittable, "\(element.identifier) never came into reach")
+        return element
+    }
+
+    private var orientationName: String {
+        XCUIDevice.shared.orientation.isLandscape ? "landscape" : "portrait"
     }
 
     private func hideKeypad() {

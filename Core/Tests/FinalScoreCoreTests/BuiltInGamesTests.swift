@@ -64,6 +64,21 @@ struct BuiltInGamesTests {
         #expect(scrabble.isBuiltIn)
     }
 
+    @Test func beloteIsPlayedInTeamsOfTwoToFiveHundredAndOne() {
+        let belote = Game.belote
+        #expect(belote.name == "Belote")
+        #expect(belote.structure == .rounds)
+        #expect(belote.teamPlay == .teams(of: 2), "The first Game whose Teams hold more than one Player")
+        #expect(belote.playerCount == 4...4)
+        #expect(belote.direction == .highWins)
+        #expect(belote.endCondition == .targetTotal(501))
+        #expect(belote.quickScores.isEmpty, "A Round's points are counted off the cards, anywhere from 0 to 162")
+        #expect(!belote.allowsNegative, "A Belote Team never scores below 0")
+        #expect(belote.scorers == .everyone, "Both Teams score the points they took")
+        #expect(belote.tracksDealer)
+        #expect(belote.isBuiltIn)
+    }
+
     @Test func pointsIsTheGenericTallyForAnyBoardGame() {
         let points = Game.points
         #expect(points.name == "Points")
@@ -79,17 +94,26 @@ struct BuiltInGamesTests {
         #expect(points.isBuiltIn)
     }
 
-    @Test func theCatalogueOffersTheFourRoundsGamesThenPoints() {
-        #expect(Game.builtIns.map(\.name) == ["Tarot", "Rami", "Skyjo", "Scrabble", "Points"])
+    @Test func theCatalogueOffersTheFiveRoundsGamesThenPoints() {
+        #expect(Game.builtIns.map(\.name) == ["Belote", "Tarot", "Rami", "Skyjo", "Scrabble", "Points"])
     }
 
     @Test(arguments: Game.builtIns)
-    func everyBuiltInIsAnIndividualGameWithAnIdentity(game: Game) {
-        #expect(game.teamPlay == .individual)
+    func everyBuiltInHasAnIdentity(game: Game) {
         #expect(game.scorers == .everyone)
         #expect(!game.symbol.isEmpty)
         #expect(game.playerCount.lowerBound >= 2)
         #expect(game.isBuiltIn)
+    }
+
+    @Test(arguments: Game.builtIns)
+    func aTeamGameOnlySeatsWholeTeams(game: Game) {
+        guard case .teams(let size) = game.teamPlay else { return }
+        #expect(size >= 2, "A Team of one is an individual Game")
+        #expect(
+            game.playerCount.allSatisfy { $0.isMultiple(of: size) },
+            "Every allowed Player count has to divide into whole Teams of \(size)"
+        )
     }
 
     @Test func everyBuiltInHasItsOwnSymbolAndAccent() {

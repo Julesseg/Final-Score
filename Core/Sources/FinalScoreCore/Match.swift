@@ -112,9 +112,24 @@ public struct Match: Codable, Hashable, Identifiable, Sendable {
         rounds[index].dealer = player
     }
 
-    /// Everyone playing, in Seating order.
+    /// Everyone playing, in Seating order — which in a Team Game is not the
+    /// order the Teams hold them, because partners sit apart. A Game that
+    /// doesn't track the Dealer has no Seating, so the seats its Teams imply
+    /// stand in: a Rematch built from this order re-forms the same Teams.
     public var players: [Player] {
-        teams.flatMap(\.players)
+        guard let seating else { return alternatingSeats }
+        let everyone = teams.flatMap(\.players)
+        let seated = seating.order.compactMap { seat in everyone.first { $0.id == seat } }
+        // Nobody playing is ever left out, whatever the Seating says.
+        return seated + everyone.filter { !seating.order.contains($0.id) }
+    }
+
+    /// One Player from each Team in turn, the way Match setup seats them.
+    private var alternatingSeats: [Player] {
+        let deepest = teams.map(\.players.count).max() ?? 0
+        return (0..<deepest).flatMap { slot in
+            teams.compactMap { slot < $0.players.count ? $0.players[slot] : nil }
+        }
     }
 
     public func round(_ id: Round.ID) -> Round? {

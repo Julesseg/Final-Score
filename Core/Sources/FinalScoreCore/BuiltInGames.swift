@@ -2,7 +2,25 @@ import Foundation
 
 extension Game {
     /// The Games that ship with the app, in the order the Game picker lists them.
-    public static let builtIns: [Game] = [.tarot, .rami, .skyjo, .scrabble, .points]
+    public static let builtIns: [Game] = [.belote, .tarot, .rami, .skyjo, .scrabble, .points]
+
+    public static let belote = Game(
+        name: "Belote",
+        symbol: "suit.club.fill",
+        accent: .blue,
+        structure: .rounds,
+        teamPlay: .teams(of: 2),
+        playerCount: 4...4,
+        direction: .highWins,
+        endCondition: .targetTotal(501),
+        // A Round's 162 points are split between the Teams by the cards each
+        // took, so a Score lands anywhere in that range and is always typed.
+        quickScores: [],
+        allowsNegative: false,
+        scorers: .everyone,
+        tracksDealer: true,
+        isBuiltIn: true
+    )
 
     public static let tarot = Game(
         name: "Tarot",

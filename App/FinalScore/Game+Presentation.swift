@@ -20,16 +20,17 @@ extension Game.AccentToken {
 }
 
 extension Game {
-    /// "2–8 players · Lowest wins"
+    /// "2–8 players · Lowest wins", or "4 players · Teams of 2 · Highest wins"
     var summary: String {
         let players = playerCount.count == 1
             ? "\(playerCount.lowerBound) players"
             : "\(playerCount.lowerBound)–\(playerCount.upperBound) players"
+        let teams = teamPlay == .individual ? nil : "Teams of \(teamPlay.size)"
         let winner = switch direction {
         case .highWins: "Highest wins"
         case .lowWins: "Lowest wins"
         }
-        return "\(players) · \(winner)"
+        return [players, teams, winner].compactMap { $0 }.joined(separator: " · ")
     }
 }
 
