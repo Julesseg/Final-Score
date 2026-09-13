@@ -42,7 +42,7 @@ struct MatchListView: View {
                 }
             }
             .sheet(isPresented: $isSettingUp) {
-                NewMatchView(roster: roster, previous: library.matches.first) { match in
+                NewMatchView(roster: roster, previous: library.lastStarted) { match in
                     library.save(match)
                     isSettingUp = false
                     path = [match.id]

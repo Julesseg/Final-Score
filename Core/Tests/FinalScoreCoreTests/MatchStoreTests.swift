@@ -122,6 +122,18 @@ final class MatchStoreTests {
         #expect(store.matches.map(\.id) == [older.id, newest.id])
     }
 
+    @Test func theNewestStartedOrderIgnoresWhetherAMatchHasEnded() throws {
+        let store = MatchStore(directory: directory)
+        let older = skyjoMatch(startedAt: Date(timeIntervalSince1970: 1_000))
+        var newest = skyjoMatch(startedAt: Date(timeIntervalSince1970: 2_000))
+        newest.end(at: Date(timeIntervalSince1970: 3_000))
+        try store.save(older)
+        try store.save(newest)
+
+        #expect(store.matches.map(\.id) == [older.id, newest.id], "The list puts the one in progress first")
+        #expect(store.newestStartedFirst.map(\.id) == [newest.id, older.id])
+    }
+
     @Test func aSnapshotTheStoreCannotReadIsSkippedRatherThanLosingTheRest() throws {
         let match = skyjoMatch()
         try MatchStore(directory: directory).save(match)

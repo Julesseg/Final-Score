@@ -34,6 +34,15 @@ public final class MatchStore {
         byID[id]
     }
 
+    /// Every Match, most recently started first, ended or not — what "the last
+    /// Match" means when its Players are picked again, whatever order the list
+    /// shows.
+    public var newestStartedFirst: [Match] {
+        // The id breaks ties, so Matches started in the same instant still come
+        // back in one stable order.
+        byID.values.sorted { ($0.startedAt, $0.id.uuidString) > ($1.startedAt, $1.id.uuidString) }
+    }
+
     /// Writes the Match's snapshot, replacing the one already there.
     ///
     /// The Match joins `matches` either way: a throw says the snapshot didn't

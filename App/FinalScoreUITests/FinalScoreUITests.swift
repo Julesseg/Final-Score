@@ -200,6 +200,13 @@ final class FinalScoreUITests: XCTestCase {
         XCTAssertTrue(rows.element(boundBy: 1).label.contains("Ada"))
         XCTAssertTrue(rows.element(boundBy: 1).label.contains("Finished"))
         XCTAssertTrue(rows.element(boundBy: 1).label.contains("Grace wins"))
+
+        // Listed below, but still the last Match started: its Players come picked.
+        openSetup("Skyjo")
+        XCTAssertTrue(app.buttons["player.Ada"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.buttons["player.Ada"].isSelected)
+        XCTAssertTrue(app.buttons["player.Grace"].isSelected)
+        XCTAssertFalse(app.buttons["player.Linus"].isSelected)
     }
 
     func testEndingAMatchInLandscape() throws {

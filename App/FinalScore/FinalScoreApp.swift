@@ -9,7 +9,7 @@ struct FinalScoreApp: App {
     init() {
         let matches = MatchStore(directory: .matchesDirectory)
         // Seeded from the Matches, for whoever played before there was a Roster.
-        let players = PlayerStore(file: .rosterFile, seedingFrom: matches.matches)
+        let players = PlayerStore(file: .rosterFile, seedingFrom: matches.newestStartedFirst)
         _library = State(initialValue: MatchLibrary(store: matches))
         _roster = State(initialValue: PlayerLibrary(store: players))
     }
