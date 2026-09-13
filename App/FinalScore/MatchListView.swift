@@ -4,6 +4,7 @@ import FinalScoreCore
 /// Home: every Match the user has started, and the way into a new one.
 struct MatchListView: View {
     let library: MatchLibrary
+    let roster: PlayerLibrary
     @State private var path: [Match.ID] = []
     @State private var isSettingUp = false
 
@@ -40,7 +41,7 @@ struct MatchListView: View {
                 }
             }
             .sheet(isPresented: $isSettingUp) {
-                NewMatchView { match in
+                NewMatchView(roster: roster, previous: library.matches.first) { match in
                     library.save(match)
                     isSettingUp = false
                     path = [match.id]

@@ -63,6 +63,11 @@ public struct Match: Codable, Hashable, Identifiable, Sendable {
         rounds[index].setScore(points, for: team)
     }
 
+    /// Everyone playing, in Seating order.
+    public var players: [Player] {
+        teams.flatMap(\.players)
+    }
+
     public func round(_ id: Round.ID) -> Round? {
         rounds.first { $0.id == id }
     }

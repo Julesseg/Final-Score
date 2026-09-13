@@ -27,9 +27,15 @@ Teams stay out of the UI unless the Game asks for them.
 _Avoid_: side, pair, partnership, column, scorer
 
 **Player**:
-A person in the user's roster, reused across Matches. Distinct from the person
+A person on the user's Roster, reused across Matches. Distinct from the person
 holding the phone.
 _Avoid_: participant, user, competitor
+
+**Roster**:
+Every Player the user has added, kept across launches. Match setup picks from
+it. A Match keeps its own copy of its Players, so renaming or deleting someone
+on the Roster never touches a Match already played.
+_Avoid_: contacts, player list, friends
 
 **Dealer**:
 The Player who deals for a given Round.

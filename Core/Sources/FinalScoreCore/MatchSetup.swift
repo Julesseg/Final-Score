@@ -1,46 +1,72 @@
 import Foundation
 
-/// The New Match form: a Game and the names of the Players who will play it.
+/// The New Match form: a Game, and the Players from the Roster who will play it.
 public struct MatchSetup: Sendable {
     public let game: Game
-    public var playerNames: [String]
+    /// Everyone who could be picked. Handing it a roster that has lost a
+    /// picked Player gives up that Player's seat.
+    public var roster: [Player] {
+        didSet {
+            seating.removeAll { id in !roster.contains { $0.id == id } }
+        }
+    }
+    /// The picked Players, in Seating order.
+    public private(set) var seating: [Player.ID]
 
-    public init(game: Game) {
+    /// Opens with the `previous` Match's Players already picked, in the same
+    /// Seating order, so a repeat game night is one tap. Anyone since deleted
+    /// from the roster is left out, and so is anyone past the most Players
+    /// this Game allows.
+    public init(game: Game, roster: [Player], previous: Match?) {
         self.game = game
-        self.playerNames = Array(repeating: "", count: game.playerCount.lowerBound)
+        self.roster = roster
+        seating = Array(
+            (previous?.players ?? [])
+                .filter { player in roster.contains { $0.id == player.id } }
+                .map(\.id)
+                .prefix(game.playerCount.upperBound)
+        )
     }
 
-    public var canAddPlayer: Bool {
-        playerNames.count < game.playerCount.upperBound
+    /// The Player's 1-based seat, or nil while they aren't picked.
+    public func seat(of player: Player.ID) -> Int? {
+        seating.firstIndex(of: player).map { $0 + 1 }
     }
 
-    public mutating func addPlayer() {
-        guard canAddPlayer else { return }
-        playerNames.append("")
+    /// Whether tapping the Player would do anything: a picked Player can always
+    /// be unpicked, anyone else only while there is a seat left.
+    public func canPick(_ player: Player.ID) -> Bool {
+        seating.contains(player) || seating.count < game.playerCount.upperBound
     }
 
-    public var canRemovePlayer: Bool {
-        playerNames.count > game.playerCount.lowerBound
+    /// Picks the Player into the next seat, or unpicks them if already picked.
+    public mutating func toggle(_ player: Player.ID) {
+        if let seat = seating.firstIndex(of: player) {
+            seating.remove(at: seat)
+        } else {
+            pick(player)
+        }
     }
 
-    public mutating func removePlayer(at index: Int) {
-        guard canRemovePlayer, playerNames.indices.contains(index) else { return }
-        playerNames.remove(at: index)
+    /// Picks the Player into the next seat while one is left. A Player already
+    /// picked keeps the seat they have.
+    public mutating func pick(_ player: Player.ID) {
+        guard !seating.contains(player), canPick(player) else { return }
+        seating.append(player)
     }
 
     public var canStart: Bool {
-        game.playerCount.contains(playerNames.count)
-            && trimmedNames.allSatisfy { !$0.isEmpty }
+        game.playerCount.contains(seating.count)
     }
 
-    /// The Match these Players start, each as a Team of one; nil until `canStart`.
+    /// The Match these Players start, each as a Team of one in Seating order;
+    /// nil until `canStart`. The Match takes its own copy of every Player, so
+    /// later Roster edits never reach it.
     public func makeMatch() -> Match? {
         guard canStart else { return nil }
-        let teams = trimmedNames.map { Team(players: [Player(name: $0)]) }
+        let teams = seating
+            .compactMap { id in roster.first { $0.id == id } }
+            .map { Team(players: [$0]) }
         return Match(game: game, teams: teams)
-    }
-
-    private var trimmedNames: [String] {
-        playerNames.map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
     }
 }

@@ -89,18 +89,111 @@ final class FinalScoreUITests: XCTestCase {
         attachScreenshot(named: "Scorepad, landscape")
     }
 
+    func testPlayersStayOnTheRosterAndTheLastMatchsPlayersComePicked() throws {
+        launch()
+        startSkyjoMatch(players: ["Grace", "Ada"])
+        backToList()
+
+        app.terminate()
+        app.launch()
+        openSkyjoSetup()
+
+        let (grace, ada) = (app.buttons["player.Grace"], app.buttons["player.Ada"])
+        XCTAssertTrue(grace.waitForExistence(timeout: 5), "The roster should survive the kill")
+        XCTAssertTrue(grace.isSelected)
+        XCTAssertTrue(ada.isSelected)
+        attachScreenshot(named: "Match setup, portrait")
+
+        app.buttons["startMatchButton"].tap()
+
+        XCTAssertTrue(app.staticTexts["teamName.0"].waitForExistence(timeout: 5))
+        XCTAssertEqual(app.staticTexts["teamName.0"].label, "Grace", "Players keep the last Match's seats")
+        XCTAssertEqual(app.staticTexts["teamName.1"].label, "Ada")
+    }
+
+    func testRenamingOrDeletingAPlayerLeavesTheirMatchAsItWas() throws {
+        launch(in: .landscapeLeft)
+        startSkyjoMatch(players: ["Ada", "Grcae"])
+        press("1", "2", "next", "5")
+        backToList()
+        openSkyjoSetup()
+
+        let typo = app.buttons["player.Grcae"]
+        XCTAssertTrue(typo.waitForExistence(timeout: 5))
+        typo.swipeLeft()
+        app.buttons["Rename"].tap()
+        let alert = app.alerts.firstMatch
+        XCTAssertTrue(alert.waitForExistence(timeout: 5))
+        let field = alert.textFields.firstMatch
+        field.typeText(String(repeating: XCUIKeyboardKey.delete.rawValue, count: 5) + "Grace")
+        alert.buttons.matching(identifier: "confirmRenameButton").element(boundBy: 0).tap()
+        XCTAssertTrue(app.buttons["player.Grace"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.buttons["player.Grace"].isSelected, "A rename keeps the Player picked")
+
+        app.buttons["player.Ada"].swipeLeft()
+        app.buttons["Delete"].tap()
+        XCTAssertTrue(app.buttons["player.Ada"].waitForNonExistence(timeout: 5))
+        attachScreenshot(named: "Match setup, landscape")
+
+        app.buttons["BackButton"].tap()
+        let cancel = app.buttons["cancelNewMatchButton"]
+        XCTAssertTrue(cancel.waitForExistence(timeout: 5))
+        cancel.tap()
+        let row = app.buttons["matchRow"]
+        XCTAssertTrue(row.waitForExistence(timeout: 5))
+        row.tap()
+
+        XCTAssertTrue(app.staticTexts["total.0"].waitForExistence(timeout: 5))
+        XCTAssertEqual(app.staticTexts["teamName.0"].label, "Ada")
+        XCTAssertEqual(app.staticTexts["teamName.1"].label, "Grcae", "A Match keeps the names it was played under")
+        XCTAssertEqual(total(0), "12")
+        XCTAssertEqual(total(1), "5")
+    }
+
     // MARK: Helpers
 
     private func launch(in orientation: UIDeviceOrientation = .portrait) {
         continueAfterFailure = false
         XCUIDevice.shared.orientation = orientation
-        // Matches are saved to disk now, so each test gets a folder of its own
-        // and starts on an empty list. Relaunching keeps the same folder.
-        app.launchEnvironment["MATCHES_FOLDER"] = "UITests-\(UUID().uuidString)"
+        // Matches and Players are saved to disk, so each test gets a folder of
+        // its own and starts with neither. Relaunching keeps the same folder.
+        app.launchEnvironment["DATA_FOLDER"] = "UITests-\(UUID().uuidString)"
         app.launch()
     }
 
     private func startSkyjoMatch(players: [String]) {
+        openSkyjoSetup()
+
+        // Unpick whoever the last Match left picked but isn't playing this one.
+        // Identifiers are read up front: the query shrinks with every unpick.
+        let picked = app.buttons
+            .matching(NSPredicate(format: "identifier BEGINSWITH 'player.' AND selected == true"))
+            .allElementsBoundByIndex.map(\.identifier)
+        for identifier in picked where !players.map({ "player.\($0)" }).contains(identifier) {
+            app.buttons[identifier].tap()
+        }
+
+        for name in players {
+            let row = app.buttons["player.\(name)"]
+            if row.exists {
+                if !row.isSelected { row.tap() }
+                continue
+            }
+            let field = app.textFields["newPlayerName"]
+            if !field.exists {
+                app.buttons["addPlayerButton"].tap()
+            }
+            XCTAssertTrue(field.waitForExistence(timeout: 5))
+            field.tap()
+            field.typeText("\(name)\n")
+            XCTAssertTrue(row.waitForExistence(timeout: 5), "\(name) should join the roster")
+        }
+
+        app.buttons["startMatchButton"].tap()
+        XCTAssertTrue(app.buttons["key.next"].waitForExistence(timeout: 5))
+    }
+
+    private func openSkyjoSetup() {
         let newMatch = app.buttons["newMatchButton"]
         XCTAssertTrue(newMatch.waitForExistence(timeout: 10))
         newMatch.tap()
@@ -108,19 +201,6 @@ final class FinalScoreUITests: XCTestCase {
         let skyjo = app.buttons["game.Skyjo"]
         XCTAssertTrue(skyjo.waitForExistence(timeout: 5))
         skyjo.tap()
-
-        for (index, name) in players.enumerated() {
-            if index >= 2 {
-                app.buttons["addPlayerButton"].tap()
-            }
-            let field = app.textFields["playerName.\(index)"]
-            XCTAssertTrue(field.waitForExistence(timeout: 5))
-            field.tap()
-            field.typeText(name)
-        }
-
-        app.buttons["startMatchButton"].tap()
-        XCTAssertTrue(app.buttons["key.next"].waitForExistence(timeout: 5))
     }
 
     private func backToList() {

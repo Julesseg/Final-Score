@@ -1,6 +1,6 @@
 import Foundation
 
-/// A person at the table.
+/// A person on the user's Roster, reused across Matches.
 public struct Player: Codable, Hashable, Identifiable, Sendable {
     public let id: UUID
     public var name: String
