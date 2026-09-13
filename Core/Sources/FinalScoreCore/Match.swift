@@ -16,10 +16,14 @@ public struct Score: Codable, Hashable, Sendable {
 public struct Round: Codable, Hashable, Identifiable, Sendable {
     public let id: UUID
     public private(set) var scores: [Score]
+    /// The Player who deals this Round; nil in a Game that doesn't track the
+    /// Dealer.
+    public internal(set) var dealer: Player.ID?
 
-    public init(id: UUID = UUID(), scores: [Score] = []) {
+    public init(id: UUID = UUID(), scores: [Score] = [], dealer: Player.ID? = nil) {
         self.id = id
         self.scores = scores
+        self.dealer = dealer
     }
 
     /// The Team's points this Round, or nil if it hasn't been scored yet.
@@ -46,24 +50,46 @@ public struct Match: Codable, Hashable, Identifiable, Sendable {
     public let game: Game
     /// Composed at setup and fixed for the whole Match.
     public let teams: [Team]
+    /// Where everyone sits and which way the deal passes; nil in a Game that
+    /// doesn't track the Dealer.
+    public let seating: Seating?
     public private(set) var rounds: [Round]
     /// When the user ended the Match; nil while it is in play. The only thing
     /// stored about the end — the Winner is always derived from the Totals.
     public private(set) var endedAt: Date?
 
-    /// A new Match opens on an empty first Round, ready to score.
-    public init(id: UUID = UUID(), startedAt: Date = Date(), game: Game, teams: [Team]) {
+    /// A new Match opens on an empty first Round, ready to score, dealt by the
+    /// first seat when there is a `seating`.
+    public init(
+        id: UUID = UUID(),
+        startedAt: Date = Date(),
+        game: Game,
+        teams: [Team],
+        seating: Seating? = nil
+    ) {
         self.id = id
         self.startedAt = startedAt
         self.game = game
         self.teams = teams
-        self.rounds = [Round()]
+        self.seating = seating
+        self.rounds = [Round(dealer: seating?.order.first)]
     }
 
     /// Records a Team's points for a Round, replacing any Score already there.
     public mutating func setScore(_ points: Int, for team: Team.ID, inRound round: Round.ID) {
         guard let index = rounds.firstIndex(where: { $0.id == round }) else { return }
         rounds[index].setScore(points, for: team)
+    }
+
+    /// Reassigns who deals a Round — a misdeal, or a house rule like "the loser
+    /// deals". Rounds already started keep their Dealer; the next new Round
+    /// passes the deal on from whoever deals the last one. Only a seated
+    /// Player can deal.
+    public mutating func setDealer(_ player: Player.ID, inRound round: Round.ID) {
+        guard seating?.order.contains(player) == true,
+              let index = rounds.firstIndex(where: { $0.id == round })
+        else { return }
+        rounds[index].dealer = player
     }
 
     /// Everyone playing, in Seating order.
@@ -86,13 +112,15 @@ public struct Match: Codable, Hashable, Identifiable, Sendable {
         rounds.last.map { !$0.scores.isEmpty } ?? true
     }
 
-    /// Moves on to a new Round. Moving on means every Team still unscored in
-    /// the last Round scored nothing, so each gets an explicit 0: only the Round
-    /// in play is ever partly filled.
+    /// Moves on to a new Round, dealt by the seat after the last Round's
+    /// Dealer. Moving on means every Team still unscored in the last Round
+    /// scored nothing, so each gets an explicit 0: only the Round in play is
+    /// ever partly filled.
     public mutating func startNewRound() {
         guard canStartNewRound else { return }
         zeroUnscoredTeamsInLastRound()
-        rounds.append(Round())
+        let dealer = rounds.last?.dealer.flatMap { seating?.dealer(after: $0) }
+        rounds.append(Round(dealer: dealer))
     }
 
     /// Takes a misdealt Round off the scorepad, Scores and all. Round numbers

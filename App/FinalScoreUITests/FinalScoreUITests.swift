@@ -289,6 +289,30 @@ final class FinalScoreUITests: XCTestCase {
         XCTAssertFalse(element("endConditionNotice").exists)
     }
 
+    func testTheDealPassesEachRoundAndCanBeHandedToSomeoneElse() throws {
+        launch()
+        passTheDealInTarot()
+        attachScreenshot(named: "Dealer, portrait")
+    }
+
+    func testDealerTrackingWorksInLandscape() throws {
+        launch(in: .landscapeLeft)
+        passTheDealInTarot()
+        attachScreenshot(named: "Dealer, landscape")
+    }
+
+    func testAGameThatDoesNotTrackTheDealerShowsNone() throws {
+        launch()
+        setUpMatch("Scrabble", players: ["Ada", "Grace"])
+        XCTAssertFalse(app.segmentedControls["rotationPicker"].exists, "Scrabble has no Dealer to pass")
+        tapStart()
+
+        press("5", "next", "next")
+
+        XCTAssertFalse(app.buttons["dealer.1"].exists)
+        XCTAssertFalse(app.buttons["dealer.2"].exists)
+    }
+
     // MARK: Helpers
 
     /// Scores three Rounds of Skyjo, retypes a Score from the first and deletes
@@ -332,6 +356,38 @@ final class FinalScoreUITests: XCTestCase {
         XCTAssertTrue(app.images["leader.0"].exists)
     }
 
+    /// A counter-clockwise Tarot Match: the deal wraps from the first seat to
+    /// the last, is handed to someone else, and passes on from them.
+    private func passTheDealInTarot() {
+        setUpMatch("Tarot", players: ["Ada", "Grace", "Linus"])
+        let rotation = app.segmentedControls["rotationPicker"]
+        XCTAssertTrue(rotation.exists)
+        rotation.buttons["Counter-clockwise"].tap()
+        tapStart()
+
+        XCTAssertEqual(dealer(inRound: 1), "Ada", "Seat 1 deals first")
+        press("1", "next", "next", "next")
+        XCTAssertEqual(dealer(inRound: 2), "Linus", "Counter-clockwise, the deal wraps round to the last seat")
+
+        // A misdeal: Grace deals Round 2 instead.
+        app.buttons["dealer.2"].tap()
+        let grace = app.buttons["Grace"]
+        XCTAssertTrue(grace.waitForExistence(timeout: 5))
+        grace.tap()
+        XCTAssertEqual(dealer(inRound: 2), "Grace")
+
+        press("2", "next", "next", "next")
+
+        XCTAssertEqual(dealer(inRound: 3), "Ada", "The deal passes on from whoever was handed it")
+        XCTAssertEqual(dealer(inRound: 1), "Ada", "Earlier Rounds keep their Dealer")
+    }
+
+    private func dealer(inRound number: Int) -> String? {
+        let badge = app.buttons["dealer.\(number)"]
+        XCTAssertTrue(badge.waitForExistence(timeout: 5), "No Dealer badge on Round \(number)")
+        return badge.value as? String
+    }
+
     /// Tarot's Quick scores in order, one nudged by ±1, and the keypad taking
     /// over from another.
     private func scoreTarotWithQuickScores() {
@@ -368,6 +424,12 @@ final class FinalScoreUITests: XCTestCase {
     }
 
     private func startMatch(_ game: String, players: [String]) {
+        setUpMatch(game, players: players)
+        tapStart()
+    }
+
+    /// Opens the Game's setup with exactly these Players picked, in this order.
+    private func setUpMatch(_ game: String, players: [String]) {
         openSetup(game)
 
         // Unpick whoever the last Match left picked but isn't playing this one.
@@ -394,7 +456,9 @@ final class FinalScoreUITests: XCTestCase {
             field.typeText("\(name)\n")
             XCTAssertTrue(row.waitForExistence(timeout: 5), "\(name) should join the roster")
         }
+    }
 
+    private func tapStart() {
         app.buttons["startMatchButton"].tap()
         XCTAssertTrue(app.buttons["key.next"].waitForExistence(timeout: 5))
     }

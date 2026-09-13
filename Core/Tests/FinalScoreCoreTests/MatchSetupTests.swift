@@ -117,4 +117,41 @@ struct MatchSetupTests {
 
         #expect(setup.seating == [ada.id, grace.id, linus.id])
     }
+
+    @Test func aGameThatTracksTheDealerStartsWithTheSeatingOrderAndChosenRotation() throws {
+        var setup = MatchSetup(game: .skyjo, roster: roster, previous: nil)
+        setup.toggle(grace.id)
+        setup.toggle(ada.id)
+        setup.toggle(linus.id)
+        #expect(setup.rotation == .clockwise, "Clockwise until told otherwise")
+
+        setup.rotation = .counterclockwise
+        let match = try #require(setup.makeMatch())
+
+        #expect(match.seating == Seating(order: [grace.id, ada.id, linus.id], rotation: .counterclockwise))
+        #expect(match.rounds[0].dealer == grace.id)
+    }
+
+    @Test func aGameThatDoesNotTrackTheDealerStartsWithNoSeating() throws {
+        let previous = match(of: .skyjo, between: [ada, grace])
+        var setup = MatchSetup(game: .scrabble, roster: roster, previous: previous)
+        setup.rotation = .counterclockwise
+
+        let match = try #require(setup.makeMatch())
+
+        #expect(match.seating == nil)
+        #expect(match.rounds[0].dealer == nil)
+    }
+
+    @Test func thePreviousMatchsRotationComesPreSelected() {
+        let previous = Match(
+            game: .tarot,
+            teams: [ada, grace, linus].map { Team(players: [$0]) },
+            seating: Seating(order: [ada.id, grace.id, linus.id], rotation: .counterclockwise)
+        )
+
+        let setup = MatchSetup(game: .skyjo, roster: roster, previous: previous)
+
+        #expect(setup.rotation == .counterclockwise)
+    }
 }
