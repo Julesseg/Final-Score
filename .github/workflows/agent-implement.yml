@@ -89,6 +89,58 @@ jobs:
             exit 1
           fi
 
+          # Every session runs on tyr, the self-hosted Mac, which carries
+          # MAX_SESSIONS at once and not many more, so this is the hard limit
+          # on it: never spawn while that many sessions this workflow started
+          # are still working. `initializing` and `running` are the states
+          # that actually occupy the machine — an idle session has finished
+          # its turn and costs it nothing.
+          #
+          # The label applied at spawn time below is what identifies them, so
+          # only this workflow's sessions count (across every repo dispatching
+          # onto tyr); one someone opens on tyr by hand is invisible here and
+          # does not hold a slot.
+          SESSION_LABEL=agent-implement
+          MAX_SESSIONS=3
+
+          # An older CLI missing either flag would not fail loudly — it would
+          # leave every session unlabeled and count zero busy ones forever, so
+          # the limit would quietly stop existing. Check before trusting it.
+          # Matched against captured help text rather than piped into grep,
+          # which can SIGPIPE the CLI under `pipefail` and read as absent.
+          case "$(paseo ls --help)" in
+            *--global*) ;;
+            *) echo "::error::This paseo CLI has no 'ls --global'; the sessions-per-host limit cannot be enforced" >&2; exit 1 ;;
+          esac
+          case "$(paseo run --help)" in
+            *--label*) ;;
+            *) echo "::error::This paseo CLI has no 'run --label'; the sessions-per-host limit cannot be enforced" >&2; exit 1 ;;
+          esac
+
+          BUSY="$(paseo ls --global --json | SESSION_LABEL="$SESSION_LABEL" python3 -c '
+          import json, os, sys
+          data = json.load(sys.stdin)
+          if isinstance(data, dict) and data.get("error"):
+              sys.exit("::error::paseo ls failed: %s" % data["error"].get("message"))
+          agents = data.get("agents", []) if isinstance(data, dict) else data
+          label = os.environ["SESSION_LABEL"]
+          print("\n".join(
+              "issue #%s (%s)" % ((a.get("labels") or {})[label], a.get("shortId") or a.get("id"))
+              for a in agents
+              if a.get("status") in ("initializing", "running") and label in (a.get("labels") or {})
+          ))
+          ')"
+          # One busy session per line; `grep -c .` counts the non-empty ones
+          # and exits 1 on zero matches, which is a count, not a failure.
+          BUSY_COUNT="$(printf '%s' "$BUSY" | grep -c . || true)"
+          if [ "$BUSY_COUNT" -ge "$MAX_SESSIONS" ]; then
+            # Deliberately not overridable with force, unlike the issue checks
+            # above: this one stands for what the hardware can take, not for
+            # bookkeeping that might be out of date.
+            echo "::notice::Not spawning: tyr is already running ${BUSY_COUNT} sessions (${BUSY//$'\n'/, }) and carries at most ${MAX_SESSIONS}. Stop one in Paseo and re-run to spawn now; otherwise the next dispatcher run picks this issue back up."
+            exit 0
+          fi
+
           # Pinned rather than left to the Paseo daemon's defaults, which move
           # as new models ship. Override per-repo with the PASEO_MODEL /
           # PASEO_THINKING Actions variables.
@@ -141,6 +193,8 @@ jobs:
           # Unlike --model/--thinking, an unresolvable --base fails the run
           # outright instead of spawning on the wrong commit, so it needs no
           # validation of its own.
+          # The --label is what the host check above counts, so it is the
+          # session's own claim on one of tyr's slots for as long as it runs.
           paseo run --detach \
             --provider claude \
             --model "$MODEL" \
@@ -151,4 +205,5 @@ jobs:
             --worktree-mode branch-off \
             --new-branch "agent/issue-${ISSUE}" \
             --base "$BASE" \
+            --label "${SESSION_LABEL}=${ISSUE}" \
             "/label-and-implement-with-pr issue #${ISSUE}"
