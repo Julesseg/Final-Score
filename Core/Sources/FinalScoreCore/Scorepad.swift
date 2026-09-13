@@ -51,6 +51,25 @@ public struct Scorepad: Sendable {
         land()
     }
 
+    // A Quick score or a ±1 leaves the Score showing as if the Team had been
+    // selected on it: the next digit replaces it, delete and sign edit it.
+
+    /// Sets the Score to one of the Game's Quick scores. The keypad is never
+    /// limited to them.
+    public mutating func enterQuickScore(_ points: Int) {
+        typed = Override(points: points)
+        land()
+    }
+
+    /// The −1 / +1 keys, so 40 then +1 +1 lands 42. Never takes a Score below
+    /// 0 in a Game without negatives, just as the keypad offers no sign key there.
+    public mutating func adjust(by delta: Int) {
+        let points = typed.points + delta
+        guard match.game.allowsNegative || points >= 0 else { return }
+        typed = Override(points: points)
+        land()
+    }
+
     /// What the Next key does from the selected Team.
     public enum NextStep: Sendable {
         /// Moves to the next Team in the same Round.

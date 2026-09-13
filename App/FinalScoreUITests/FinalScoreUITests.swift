@@ -8,7 +8,7 @@ final class FinalScoreUITests: XCTestCase {
 
     func testScoringTwoSkyjoRoundsTotalsEachPlayer() throws {
         launch()
-        startSkyjoMatch(players: ["Ada", "Grace"])
+        startMatch("Skyjo", players: ["Ada", "Grace"])
 
         // Round 1 opens on Ada.
         press("1", "2", "next", "5", "next")
@@ -25,12 +25,13 @@ final class FinalScoreUITests: XCTestCase {
         XCTAssertFalse(app.staticTexts["partialTotalsNotice"].exists)
         XCTAssertTrue(app.images["leader.0"].exists, "Lowest Total leads in Skyjo")
         XCTAssertEqual(app.buttons["score.2.0"].value as? String, "-3")
+        XCTAssertFalse(app.buttons["quickScore.0"].exists, "Skyjo declares no Quick scores")
         attachScreenshot(named: "Scorepad, portrait")
     }
 
     func testAMatchShowsAsInProgressAndResumesFromTheList() throws {
         launch()
-        startSkyjoMatch(players: ["Ada", "Grace"])
+        startMatch("Skyjo", players: ["Ada", "Grace"])
         press("7", "next", "next")
 
         backToList()
@@ -49,11 +50,11 @@ final class FinalScoreUITests: XCTestCase {
 
     func testEveryMatchComesBackAfterAKillNewestFirst() throws {
         launch()
-        startSkyjoMatch(players: ["Ada", "Grace"])
+        startMatch("Skyjo", players: ["Ada", "Grace"])
         // Round 1 in full, then Round 2 left half scored: Ada has 8, Grace hasn't played.
         press("1", "2", "next", "5", "next", "8")
         backToList()
-        startSkyjoMatch(players: ["Linus", "Marie"])
+        startMatch("Skyjo", players: ["Linus", "Marie"])
         press("4")
         backToList()
 
@@ -79,13 +80,14 @@ final class FinalScoreUITests: XCTestCase {
 
     func testScoringWorksInLandscape() throws {
         launch(in: .landscapeLeft)
-        startSkyjoMatch(players: ["Ada", "Grace", "Linus"])
+        startMatch("Skyjo", players: ["Ada", "Grace", "Linus"])
 
         press("4", "next", "1", "1", "next", "6")
 
         XCTAssertEqual(total(0), "4")
         XCTAssertEqual(total(1), "11")
         XCTAssertEqual(total(2), "6")
+        XCTAssertFalse(app.buttons["quickScore.0"].exists, "Skyjo declares no Quick scores")
         attachScreenshot(named: "Scorepad, landscape")
     }
 
@@ -104,7 +106,7 @@ final class FinalScoreUITests: XCTestCase {
     func testARoundOfAScorepadTooWideToSwipeIsDeletedFromItsMenu() throws {
         launch()
         // Five columns overflow a portrait iPhone, so a sideways drag scrolls.
-        startSkyjoMatch(players: ["Ada", "Grace", "Linus", "Marie", "Alan"])
+        startMatch("Skyjo", players: ["Ada", "Grace", "Linus", "Marie", "Alan"])
         press("1", "next", "2", "next", "3", "next", "4", "next", "5", "next", "6")
         app.buttons["hideKeypadButton"].tap()
 
@@ -121,12 +123,12 @@ final class FinalScoreUITests: XCTestCase {
 
     func testPlayersStayOnTheRosterAndTheLastMatchsPlayersComePicked() throws {
         launch()
-        startSkyjoMatch(players: ["Grace", "Ada"])
+        startMatch("Skyjo", players: ["Grace", "Ada"])
         backToList()
 
         app.terminate()
         app.launch()
-        openSkyjoSetup()
+        openSetup("Skyjo")
 
         let (grace, ada) = (app.buttons["player.Grace"], app.buttons["player.Ada"])
         XCTAssertTrue(grace.waitForExistence(timeout: 5), "The roster should survive the kill")
@@ -143,10 +145,10 @@ final class FinalScoreUITests: XCTestCase {
 
     func testRenamingOrDeletingAPlayerLeavesTheirMatchAsItWas() throws {
         launch(in: .landscapeLeft)
-        startSkyjoMatch(players: ["Ada", "Grcae"])
+        startMatch("Skyjo", players: ["Ada", "Grcae"])
         press("1", "2", "next", "5")
         backToList()
-        openSkyjoSetup()
+        openSetup("Skyjo")
 
         let typo = app.buttons["player.Grcae"]
         XCTAssertTrue(typo.waitForExistence(timeout: 5))
@@ -180,10 +182,24 @@ final class FinalScoreUITests: XCTestCase {
         XCTAssertEqual(total(1), "5")
     }
 
+    func testAQuickScoreThenPlusOneEntersAScore() throws {
+        launch()
+        scoreTarotWithQuickScores()
+        attachScreenshot(named: "Quick scores, portrait")
+    }
+
+    func testQuickScoresWorkInLandscape() throws {
+        launch(in: .landscapeLeft)
+        scoreTarotWithQuickScores()
+        attachScreenshot(named: "Quick scores, landscape")
+    }
+
+    // MARK: Helpers
+
     /// Scores three Rounds of Skyjo, retypes a Score from the first and deletes
     /// the second, checking the Totals, the leader and the Round numbers.
     private func correctAnOldScoreAndDeleteARound() {
-        startSkyjoMatch(players: ["Ada", "Grace"])
+        startMatch("Skyjo", players: ["Ada", "Grace"])
         press("4", "next", "9", "next")
         press("2", "0", "next", "2", "next")
         press("5", "next", "5", "next")
@@ -219,7 +235,31 @@ final class FinalScoreUITests: XCTestCase {
         XCTAssertTrue(app.images["leader.0"].exists)
     }
 
-    // MARK: Helpers
+    /// Tarot's Quick scores in order, one nudged by ±1, and the keypad taking
+    /// over from another.
+    private func scoreTarotWithQuickScores() {
+        startMatch("Tarot", players: ["Ada", "Grace", "Linus"])
+
+        let quickScores = (0..<4).map { app.buttons["quickScore.\($0)"] }
+        XCTAssertEqual(quickScores.map(\.label), ["25", "50", "100", "150"])
+        XCTAssertFalse(app.buttons["quickScore.4"].exists)
+
+        // Ada: a Quick score, nudged up.
+        quickScores[1].tap()
+        press("plusOne", "plusOne")
+        XCTAssertEqual(app.staticTexts["keypadDisplay"].label, "52")
+        press("next")
+        // Grace: a Quick score typed over — the keypad ignores Quick scores.
+        quickScores[0].tap()
+        press("3", "7", "next")
+        // Linus: nothing yet, then −1.
+        press("minusOne")
+
+        XCTAssertEqual(app.buttons["score.1.0"].value as? String, "52")
+        XCTAssertEqual(total(0), "52")
+        XCTAssertEqual(total(1), "37")
+        XCTAssertEqual(total(2), "-1")
+    }
 
     private func launch(in orientation: UIDeviceOrientation = .portrait) {
         continueAfterFailure = false
@@ -230,8 +270,8 @@ final class FinalScoreUITests: XCTestCase {
         app.launch()
     }
 
-    private func startSkyjoMatch(players: [String]) {
-        openSkyjoSetup()
+    private func startMatch(_ game: String, players: [String]) {
+        openSetup(game)
 
         // Unpick whoever the last Match left picked but isn't playing this one.
         // Identifiers are read up front: the query shrinks with every unpick.
@@ -262,14 +302,14 @@ final class FinalScoreUITests: XCTestCase {
         XCTAssertTrue(app.buttons["key.next"].waitForExistence(timeout: 5))
     }
 
-    private func openSkyjoSetup() {
+    private func openSetup(_ game: String) {
         let newMatch = app.buttons["newMatchButton"]
         XCTAssertTrue(newMatch.waitForExistence(timeout: 10))
         newMatch.tap()
 
-        let skyjo = app.buttons["game.Skyjo"]
-        XCTAssertTrue(skyjo.waitForExistence(timeout: 5))
-        skyjo.tap()
+        let gameRow = app.buttons["game.\(game)"]
+        XCTAssertTrue(gameRow.waitForExistence(timeout: 5))
+        gameRow.tap()
     }
 
     private func backToList() {

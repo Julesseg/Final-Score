@@ -13,7 +13,9 @@ extension Game {
         playerCount: 3...5,
         direction: .highWins,
         endCondition: .none,
-        quickScores: [],
+        // What a Petite, Garde, Garde sans and Garde contre are worth against
+        // each defender when made or lost by nothing. Other Scores are typed.
+        quickScores: [25, 50, 100, 150],
         allowsNegative: true,
         scorers: .everyone,
         tracksDealer: true,
