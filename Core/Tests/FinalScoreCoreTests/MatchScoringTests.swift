@@ -208,6 +208,31 @@ struct MatchScoringTests {
         #expect(skyjoMatch().leaders.isEmpty)
     }
 
+    @Test func theLeadingTotalIsTheLowestInSkyjo() {
+        var match = skyjoMatch()
+        score([[12, 5, 30], [-2, 8, 1]], in: &match)
+
+        #expect(match.leadingTotal == 10)
+    }
+
+    @Test func theLeadingTotalIsTheHighestWhenTheHighestWins() {
+        var match = Match(game: .scrabble, teams: ["Ada", "Grace"].map { Team(players: [Player(name: $0)]) })
+        score([[40, 12], [3, 60]], in: &match)
+
+        #expect(match.leadingTotal == 72)
+    }
+
+    @Test func teamsLevelOnTheBestTotalShareTheLeadingTotal() {
+        var match = skyjoMatch()
+        score([[4, 9, 4]], in: &match)
+
+        #expect(match.leadingTotal == 4)
+    }
+
+    @Test func thereIsNoLeadingTotalBeforeTheFirstScore() {
+        #expect(skyjoMatch().leadingTotal == nil)
+    }
+
     @Test func aNewRoundWaitsUntilTheLastOneHasAScore() {
         var match = skyjoMatch()
         #expect(!match.canStartNewRound)
