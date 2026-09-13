@@ -2,8 +2,9 @@ import SwiftUI
 import FinalScoreCore
 
 /// The paper scorepad: one column per Team, one row per Round, Totals along
-/// the bottom. Tapping a Score opens the keypad on it; what to do with each key
-/// is `Scorepad`'s business, in Core.
+/// the bottom. Tapping a Score opens the keypad on it, however old the Round;
+/// swiping a Round, or its menu, deletes it. What each gesture and key does is
+/// `Scorepad`'s business, in Core.
 struct ScorepadView: View {
     @Binding var match: Match
     @State private var scorepad: Scorepad
@@ -135,28 +136,28 @@ struct ScorepadView: View {
                 Self.minimumTeamColumnWidth,
                 (proxy.size.width - Self.roundColumnWidth) / CGFloat(max(teams.count, 1))
             )
+            let contentWidth = Self.roundColumnWidth + columnWidth * CGFloat(teams.count)
             ScrollView(.horizontal) {
                 VStack(spacing: 0) {
                     header(columnWidth: columnWidth)
                     Divider()
                     ScrollViewReader { scroller in
-                        ScrollView(.vertical) {
-                            LazyVStack(spacing: 0) {
-                                ForEach(Array(scorepad.match.rounds.enumerated()), id: \.element.id) { index, round in
-                                    row(round, number: index + 1, columnWidth: columnWidth)
-                                        .id(round.id)
-                                }
+                        List {
+                            ForEach(Array(scorepad.match.rounds.enumerated()), id: \.element.id) { index, round in
+                                row(round, number: index + 1, columnWidth: columnWidth)
+                                    .id(round.id)
                             }
                         }
-                        .onChange(of: scorepad.match.rounds.count) {
-                            if let last = scorepad.match.rounds.last {
-                                withAnimation { scroller.scrollTo(last.id, anchor: .bottom) }
-                            }
+                        .listStyle(.plain)
+                        .onChange(of: scorepad.match.rounds.count) { previous, count in
+                            guard count > previous, let last = scorepad.match.rounds.last else { return }
+                            withAnimation { scroller.scrollTo(last.id, anchor: .bottom) }
                         }
                     }
                     Divider()
                     totals(columnWidth: columnWidth)
                 }
+                .frame(width: max(contentWidth, proxy.size.width), height: proxy.size.height)
             }
             .scrollBounceBehavior(.basedOnSize, axes: .horizontal)
         }
@@ -192,6 +193,23 @@ struct ScorepadView: View {
             }
         }
         .padding(.vertical, 2)
+        .listRowInsets(EdgeInsets())
+        .listRowSeparator(.hidden)
+        // A whole Round goes with no undo, so it takes a deliberate tap.
+        .swipeActions(allowsFullSwipe: false) {
+            deleteButton(for: round)
+        }
+        // Once the Teams overflow, a sideways drag scrolls the grid instead of
+        // swiping, so the Round's menu is the way to delete it at any width.
+        .contextMenu {
+            deleteButton(for: round)
+        }
+    }
+
+    private func deleteButton(for round: Round) -> some View {
+        Button("Delete Round", systemImage: "trash", role: .destructive) {
+            withAnimation { scorepad.deleteRound(round.id) }
+        }
     }
 
     private func score(of team: Team, in round: Round, roundNumber: Int, teamIndex: Int) -> some View {

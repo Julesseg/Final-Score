@@ -95,6 +95,16 @@ public struct Match: Codable, Hashable, Identifiable, Sendable {
         rounds.append(Round())
     }
 
+    /// Takes a misdealt Round off the scorepad, Scores and all. Round numbers
+    /// come from position, so the Rounds after it close up. A Match is never
+    /// without a Round: deleting the only one leaves an empty one to score.
+    public mutating func deleteRound(_ id: Round.ID) {
+        rounds.removeAll { $0.id == id }
+        if rounds.isEmpty {
+            rounds = [Round()]
+        }
+    }
+
     /// The Team's Scores summed across every Round. Derived, never stored.
     public func total(for team: Team.ID) -> Int {
         total(for: team, in: rounds)

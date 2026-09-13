@@ -91,6 +91,36 @@ final class FinalScoreUITests: XCTestCase {
         attachScreenshot(named: "Scorepad, landscape")
     }
 
+    func testCorrectingAnOldScoreAndDeletingARoundRecomputeTheTotals() throws {
+        launch()
+        correctAnOldScoreAndDeleteARound()
+        attachScreenshot(named: "Scorepad after a deleted Round, portrait")
+    }
+
+    func testCorrectingAnOldScoreAndDeletingARoundWorkInLandscape() throws {
+        launch(in: .landscapeLeft)
+        correctAnOldScoreAndDeleteARound()
+        attachScreenshot(named: "Scorepad after a deleted Round, landscape")
+    }
+
+    func testARoundOfAScorepadTooWideToSwipeIsDeletedFromItsMenu() throws {
+        launch()
+        // Five columns overflow a portrait iPhone, so a sideways drag scrolls.
+        startMatch("Skyjo", players: ["Ada", "Grace", "Linus", "Marie", "Alan"])
+        press("1", "next", "2", "next", "3", "next", "4", "next", "5", "next", "6")
+        app.buttons["hideKeypadButton"].tap()
+
+        app.buttons["score.1.0"].press(forDuration: 1)
+        let delete = app.buttons["Delete Round"]
+        XCTAssertTrue(delete.waitForExistence(timeout: 5))
+        delete.tap()
+
+        XCTAssertTrue(app.buttons["score.2.0"].waitForNonExistence(timeout: 5))
+        XCTAssertEqual(app.buttons["score.1.0"].value as? String, "6", "Round 2 closes up to become Round 1")
+        XCTAssertEqual(total(0), "6")
+        XCTAssertEqual(total(1), "0")
+    }
+
     func testPlayersStayOnTheRosterAndTheLastMatchsPlayersComePicked() throws {
         launch()
         startMatch("Skyjo", players: ["Grace", "Ada"])
@@ -260,6 +290,47 @@ final class FinalScoreUITests: XCTestCase {
     }
 
     // MARK: Helpers
+
+    /// Scores three Rounds of Skyjo, retypes a Score from the first and deletes
+    /// the second, checking the Totals, the leader and the Round numbers.
+    private func correctAnOldScoreAndDeleteARound() {
+        startMatch("Skyjo", players: ["Ada", "Grace"])
+        press("4", "next", "9", "next")
+        press("2", "0", "next", "2", "next")
+        press("5", "next", "5", "next")
+        XCTAssertEqual(total(0), "29")
+        XCTAssertEqual(total(1), "16")
+        XCTAssertTrue(app.images["leader.1"].exists, "Lowest Total leads in Skyjo")
+
+        // Grace's 9 in Round 1 was really a 30. With the keypad up, a small
+        // phone only has room for the last Rounds, so put it away to see Round 1.
+        app.buttons["hideKeypadButton"].tap()
+        app.buttons["score.1.1"].tap()
+        XCTAssertEqual(app.staticTexts["keypadDisplay"].label, "9")
+        press("3", "0")
+
+        XCTAssertEqual(total(1), "37")
+        XCTAssertTrue(app.images["leader.0"].exists, "The correction hands Ada the lead")
+        XCTAssertFalse(app.images["leader.1"].exists)
+        XCTAssertFalse(app.buttons["score.5.0"].exists, "Correcting a Score never starts a Round")
+
+        // Done on an earlier Round's last Team puts the keypad away.
+        press("next")
+        XCTAssertTrue(app.buttons["key.next"].waitForNonExistence(timeout: 5))
+
+        // Round 2 was misdealt.
+        app.buttons["score.2.0"].swipeLeft()
+        let delete = app.buttons["Delete Round"]
+        XCTAssertTrue(delete.waitForExistence(timeout: 5))
+        delete.tap()
+
+        XCTAssertTrue(app.buttons["score.4.0"].waitForNonExistence(timeout: 5))
+        XCTAssertEqual(app.buttons["score.2.0"].value as? String, "5", "Round 3 closes up to become Round 2")
+        XCTAssertEqual(app.buttons["score.3.0"].value as? String, "Not scored")
+        XCTAssertEqual(total(0), "9")
+        XCTAssertEqual(total(1), "35")
+        XCTAssertTrue(app.images["leader.0"].exists)
+    }
 
     /// Tarot's Quick scores in order, one nudged by ±1, and the keypad taking
     /// over from another.

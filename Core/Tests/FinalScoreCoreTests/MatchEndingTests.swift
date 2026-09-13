@@ -176,6 +176,19 @@ struct MatchEndingTests {
         #expect(match.outcome == .won(by: match.teams[2]))
     }
 
+    @Test func deletingAMisdealtRoundAfterTheEndCorrectsTheWinner() {
+        var match = match(of: .skyjo)
+        play([10, 20, 30], in: &match)
+        play([40, 5, 5], in: &match)
+        match.end()
+        #expect(match.outcome == .won(by: match.teams[1]))
+
+        match.deleteRound(match.rounds[0].id)
+
+        #expect(match.outcome == .tied([match.teams[1], match.teams[2]]))
+        #expect(match.isEnded)
+    }
+
     @Test func aMatchEndedBeforeAnyScoreHasNoWinner() {
         var match = match(of: .skyjo)
         match.end()
