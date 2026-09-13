@@ -9,6 +9,17 @@ struct MatchScoringTests {
         Match(game: .skyjo, teams: ["Ada", "Grace", "Linus"].map { Team(players: [Player(name: $0)]) })
     }
 
+    /// Scores each row of points, in column order, as a full Round and moves on.
+    private func score(_ rounds: [[Int]], in match: inout Match) {
+        for points in rounds {
+            let round = match.rounds[match.rounds.count - 1].id
+            for (team, points) in zip(match.teams, points) {
+                match.setScore(points, for: team.id, inRound: round)
+            }
+            match.startNewRound()
+        }
+    }
+
     @Test func totalsSumEachTeamsScoresAcrossRounds() {
         var match = skyjoMatch()
         let (ada, grace, linus) = (match.teams[0].id, match.teams[1].id, match.teams[2].id)
@@ -124,6 +135,63 @@ struct MatchScoringTests {
         match.setScore(-12, for: linus, inRound: match.rounds[1].id)
 
         #expect(match.leaders.map(\.name) == ["Linus"])
+    }
+
+    @Test func correctingAScoreThreeRoundsAgoHandsTheLeadOver() {
+        var match = skyjoMatch()
+        let ada = match.teams[0].id
+        score([[4, 9, 10], [6, 2, 3], [5, 5, 5], [1, 1, 1]], in: &match)
+        #expect(match.leaders.map(\.name) == ["Ada"])
+
+        match.setScore(14, for: ada, inRound: match.rounds[0].id)
+
+        #expect(match.total(for: ada) == 26)
+        #expect(match.leaders.map(\.name) == ["Grace"])
+    }
+
+    @Test func deletingARoundTakesItsScoresOutOfTheTotalsAndTheLead() {
+        var match = skyjoMatch()
+        let ada = match.teams[0].id
+        score([[4, 9, 10], [20, 2, 3], [5, 5, 5]], in: &match)
+        #expect(match.leaders.map(\.name) == ["Grace"])
+        let (second, third) = (match.rounds[1].id, match.rounds[2].id)
+
+        match.deleteRound(second)
+
+        #expect(match.rounds.count == 3)
+        #expect(match.round(second) == nil)
+        #expect(match.number(of: third) == 2)
+        #expect(match.total(for: ada) == 9)
+        #expect(match.leaders.map(\.name) == ["Ada"])
+    }
+
+    @Test func deletingTheRoundInPlayLeavesTheOneBeforeItLast() {
+        var match = skyjoMatch()
+        for team in match.teams {
+            match.setScore(3, for: team.id, inRound: match.rounds[0].id)
+        }
+        match.startNewRound()
+        match.setScore(7, for: match.teams[0].id, inRound: match.rounds[1].id)
+        #expect(match.totalsArePartial)
+
+        match.deleteRound(match.rounds[1].id)
+
+        #expect(match.rounds.count == 1)
+        #expect(!match.totalsArePartial)
+        #expect(match.canStartNewRound)
+    }
+
+    @Test func deletingTheOnlyRoundLeavesAnEmptyOneToScore() {
+        var match = skyjoMatch()
+        let only = match.rounds[0].id
+        match.setScore(7, for: match.teams[0].id, inRound: only)
+
+        match.deleteRound(only)
+
+        #expect(match.rounds.count == 1)
+        #expect(match.rounds[0].id != only)
+        #expect(match.rounds[0].scores.isEmpty)
+        #expect(match.leaders.isEmpty)
     }
 
     @Test func teamsLevelOnTheBestTotalShareTheLead() {

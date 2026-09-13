@@ -90,6 +90,16 @@ public struct Scorepad: Sendable {
         selectFirstUnscoredTeam()
     }
 
+    /// Deletes a Round. A keypad on it moves to the first Team still unscored
+    /// in the last Round, or is put away if there is none; anywhere else it
+    /// stays put.
+    public mutating func deleteRound(_ id: Round.ID) {
+        match.deleteRound(id)
+        guard selection?.round == id else { return }
+        deselect()
+        selectFirstUnscoredTeam()
+    }
+
     private var teamAfterSelection: Team.ID? {
         guard let selection,
               let index = match.teams.firstIndex(where: { $0.id == selection.team }),
