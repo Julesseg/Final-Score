@@ -79,6 +79,21 @@ struct BuiltInGamesTests {
         #expect(belote.isBuiltIn)
     }
 
+    @Test func coincheGivesEachRoundToTheOneTeamThatScoredIt() {
+        let coinche = Game.coinche
+        #expect(coinche.name == "Coinche")
+        #expect(coinche.structure == .rounds)
+        #expect(coinche.teamPlay == .teams(of: 2))
+        #expect(coinche.playerCount == 4...4)
+        #expect(coinche.direction == .highWins)
+        #expect(coinche.endCondition == .targetTotal(1000))
+        #expect(coinche.quickScores == [80, 90, 100, 110, 120, 130, 140, 150, 160], "The nine contracts")
+        #expect(!coinche.allowsNegative)
+        #expect(coinche.scorers == .oneTeamPerRound, "A contract made or lost scores for one Team only")
+        #expect(coinche.tracksDealer)
+        #expect(coinche.isBuiltIn)
+    }
+
     @Test func pointsIsTheGenericTallyForAnyBoardGame() {
         let points = Game.points
         #expect(points.name == "Points")
@@ -94,13 +109,12 @@ struct BuiltInGamesTests {
         #expect(points.isBuiltIn)
     }
 
-    @Test func theCatalogueOffersTheFiveRoundsGamesThenPoints() {
-        #expect(Game.builtIns.map(\.name) == ["Belote", "Tarot", "Rami", "Skyjo", "Scrabble", "Points"])
+    @Test func theCatalogueOffersTheSixRoundsGamesThenPoints() {
+        #expect(Game.builtIns.map(\.name) == ["Belote", "Coinche", "Tarot", "Rami", "Skyjo", "Scrabble", "Points"])
     }
 
     @Test(arguments: Game.builtIns)
     func everyBuiltInHasAnIdentity(game: Game) {
-        #expect(game.scorers == .everyone)
         #expect(!game.symbol.isEmpty)
         #expect(game.playerCount.lowerBound >= 2)
         #expect(game.isBuiltIn)

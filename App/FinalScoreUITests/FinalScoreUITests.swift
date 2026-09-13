@@ -311,6 +311,18 @@ final class FinalScoreUITests: XCTestCase {
         attachScreenshot(named: "Belote scorepad, landscape")
     }
 
+    func testScoringACoincheRoundAsksWhichTeamScored() throws {
+        launch()
+        scoreCoincheRounds()
+        attachScreenshot(named: "Coinche scorepad, portrait")
+    }
+
+    func testCoincheScoringWorksInLandscape() throws {
+        launch(in: .landscapeLeft)
+        scoreCoincheRounds()
+        attachScreenshot(named: "Coinche scorepad, landscape")
+    }
+
     func testAGameThatDoesNotTrackTheDealerShowsNone() throws {
         launch()
         setUpMatch("Scrabble", players: ["Ada", "Grace"])
@@ -389,7 +401,7 @@ final class FinalScoreUITests: XCTestCase {
     /// With no Matches, every built-in Game is a card, New Match sits at the
     /// bottom, and a card opens setup straight on its Game's Players.
     private func startSetupFromAGameCard(_ game: String) {
-        for name in ["Belote", "Tarot", "Rami", "Skyjo", "Scrabble", "Points"] {
+        for name in ["Belote", "Coinche", "Tarot", "Rami", "Skyjo", "Scrabble", "Points"] {
             XCTAssertTrue(app.buttons["gameCard.\(name)"].waitForExistence(timeout: 10), "No card for \(name)")
         }
         XCTAssertFalse(app.buttons["matchRow"].exists)
@@ -409,18 +421,19 @@ final class FinalScoreUITests: XCTestCase {
         assertNewMatchIsPinnedToTheBottom()
     }
 
-    /// Taps a Game's card and waits for its setup. Six Games overflow a small
-    /// phone in landscape, and the grid scrolls under the New Match button
-    /// pinned over it, so the card is scrolled clear first. A tap that lands on
-    /// that button anyway opens the Game list instead: it is cancelled and the
-    /// card tried once more, rather than failing on a mistimed scroll.
+    /// Taps a Game's card and waits for its setup. Seven Games overflow a
+    /// phone in landscape, and the grid scrolls under the New Match bar pinned
+    /// over it, where a card can't be tapped, so the card is scrolled clear
+    /// first. A tap that lands on that button anyway opens the Game list
+    /// instead: it is cancelled and the card tried once more, rather than
+    /// failing on a mistimed scroll.
     private func tapGameCard(_ game: String) {
         let card = app.buttons["gameCard.\(game)"]
         let newMatch = app.buttons["newMatchButton"]
         XCTAssertTrue(card.waitForExistence(timeout: 10), "No card for \(game)")
         for attempt in 1...2 {
             for _ in 0..<5 where card.frame.maxY > newMatch.frame.minY {
-                app.swipeUp()
+                dragContentUp()
             }
             card.tap()
             if app.navigationBars[game].waitForExistence(timeout: 5) { return }
@@ -433,6 +446,13 @@ final class FinalScoreUITests: XCTestCase {
             XCTAssertTrue(card.waitForExistence(timeout: 5))
             XCTAssertEqual(attempt, 1, "\(game)'s card never opened its setup")
         }
+    }
+
+    /// Scrolls up by a held drag: a quick `swipeUp()` leaves the Game cards
+    /// where they are.
+    private func dragContentUp() {
+        app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.7))
+            .press(forDuration: 0.1, thenDragTo: app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.2)))
     }
 
     /// A Match tied in play above a Match that ended tied, each row saying so.
@@ -589,6 +609,55 @@ final class FinalScoreUITests: XCTestCase {
         app.buttons["newRoundButton"].tap()
         hideKeypad()
         XCTAssertEqual(dealer(inRound: 2), "Linus", "The deal passes to seat 2 — a Player on the other Team")
+    }
+
+    /// Coinche, where one Team scores each Round: the Round asks who scored
+    /// before the keypad opens, the other Team gets its 0 without a tap, and a
+    /// Score tapped on the grid is still typed over.
+    private func scoreCoincheRounds() {
+        setUpMatch("Coinche", players: ["Ada", "Grace", "Linus", "Marie"])
+        dismissNameField()
+        tapStart()
+        XCTAssertEqual(app.staticTexts["teamName.0"].label, "Ada & Linus")
+        XCTAssertEqual(app.staticTexts["teamName.1"].label, "Grace & Marie")
+
+        let question = app.staticTexts["scorerQuestion"]
+        XCTAssertTrue(question.waitForExistence(timeout: 5))
+        XCTAssertEqual(question.label, "Who scored Round 1?")
+        XCTAssertFalse(app.buttons["key.next"].exists, "The keypad waits for a Team")
+        attachScreenshot(named: "Coinche asks who scored, \(orientationName)")
+
+        // Grace & Marie made an 80 contract.
+        tap("scorer.1")
+        XCTAssertTrue(app.buttons["key.next"].waitForExistence(timeout: 5))
+        XCTAssertFalse(question.exists)
+        XCTAssertEqual(app.buttons["quickScore.0"].label, "80", "The contracts are the Quick scores")
+        tap("quickScore.0")
+
+        XCTAssertEqual(app.buttons["score.1.1"].value as? String, "80")
+        XCTAssertEqual(app.buttons["score.1.0"].value as? String, "0", "The other Team scores 0 untouched")
+        XCTAssertFalse(app.staticTexts["partialTotalsNotice"].exists, "The Round is fully scored")
+        XCTAssertEqual(total(1), "80")
+        attachScreenshot(named: "Coinche keypad on the scorer, \(orientationName)")
+
+        // Next skips the Team already on 0 and asks about Round 2.
+        XCTAssertEqual(app.buttons["key.next"].label, "New Round")
+        press("next")
+        XCTAssertTrue(question.waitForExistence(timeout: 5))
+        XCTAssertEqual(question.label, "Who scored Round 2?")
+
+        // Ada & Linus, 130.
+        tap("scorer.0")
+        press("1", "3", "0")
+        XCTAssertEqual(total(0), "130")
+        XCTAssertEqual(app.buttons["score.2.1"].value as? String, "0")
+        XCTAssertTrue(app.images["leader.0"].exists)
+
+        // The keypad Override still reaches the other Team: 20 for belote in defence.
+        tap("score.2.1")
+        press("2", "0")
+        XCTAssertEqual(total(1), "100")
+        XCTAssertEqual(total(0), "130")
     }
 
     /// The Add Player field stays open for the next name; an empty submit puts

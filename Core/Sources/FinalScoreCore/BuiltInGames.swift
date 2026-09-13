@@ -2,7 +2,7 @@ import Foundation
 
 extension Game {
     /// The Games that ship with the app, in the order the Game picker lists them.
-    public static let builtIns: [Game] = [.belote, .tarot, .rami, .skyjo, .scrabble, .points]
+    public static let builtIns: [Game] = [.belote, .coinche, .tarot, .rami, .skyjo, .scrabble, .points]
 
     public static let belote = Game(
         name: "Belote",
@@ -18,6 +18,26 @@ extension Game {
         quickScores: [],
         allowsNegative: false,
         scorers: .everyone,
+        tracksDealer: true,
+        isBuiltIn: true
+    )
+
+    public static let coinche = Game(
+        name: "Coinche",
+        symbol: "suit.spade.fill",
+        accent: .purple,
+        structure: .rounds,
+        teamPlay: .teams(of: 2),
+        playerCount: 4...4,
+        direction: .highWins,
+        endCondition: .targetTotal(1000),
+        // The nine contracts a Team can bid, from 80 to 160. Capot, a coinche
+        // doubling the stakes and the points taken in defence are typed.
+        quickScores: Array(stride(from: 80, through: 160, by: 10)),
+        allowsNegative: false,
+        // A Round goes to the Team that made its contract, or to the defence
+        // when it fell.
+        scorers: .oneTeamPerRound,
         tracksDealer: true,
         isBuiltIn: true
     )
