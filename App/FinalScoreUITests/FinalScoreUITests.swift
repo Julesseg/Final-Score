@@ -299,6 +299,18 @@ final class FinalScoreUITests: XCTestCase {
         attachScreenshot(named: "Dealer, landscape")
     }
 
+    func testSettingUpABeloteMatchComposesTeamsAndScoresARound() throws {
+        launch()
+        composeBeloteTeamsAndScoreARound()
+        attachScreenshot(named: "Belote scorepad, portrait")
+    }
+
+    func testBeloteTeamsWorkInLandscape() throws {
+        launch(in: .landscapeLeft)
+        composeBeloteTeamsAndScoreARound()
+        attachScreenshot(named: "Belote scorepad, landscape")
+    }
+
     func testAGameThatDoesNotTrackTheDealerShowsNone() throws {
         launch()
         setUpMatch("Scrabble", players: ["Ada", "Grace"])
@@ -377,14 +389,14 @@ final class FinalScoreUITests: XCTestCase {
     /// With no Matches, every built-in Game is a card, New Match sits at the
     /// bottom, and a card opens setup straight on its Game's Players.
     private func startSetupFromAGameCard(_ game: String) {
-        for name in ["Tarot", "Rami", "Skyjo", "Scrabble", "Points"] {
+        for name in ["Belote", "Tarot", "Rami", "Skyjo", "Scrabble", "Points"] {
             XCTAssertTrue(app.buttons["gameCard.\(name)"].waitForExistence(timeout: 10), "No card for \(name)")
         }
         XCTAssertFalse(app.buttons["matchRow"].exists)
         assertNewMatchIsPinnedToTheBottom()
         attachScreenshot(named: "First launch, \(XCUIDevice.shared.orientation.isLandscape ? "landscape" : "portrait")")
 
-        app.buttons["gameCard.\(game)"].tap()
+        tapGameCard(game)
 
         XCTAssertTrue(app.navigationBars[game].waitForExistence(timeout: 5), "Setup opens on \(game)")
         XCTAssertTrue(app.textFields["newPlayerName"].waitForExistence(timeout: 5))
@@ -395,6 +407,32 @@ final class FinalScoreUITests: XCTestCase {
         XCTAssertTrue(app.buttons["matchRow"].waitForExistence(timeout: 5))
         XCTAssertFalse(app.buttons["gameCard.\(game)"].exists, "The cards give way to the Match list")
         assertNewMatchIsPinnedToTheBottom()
+    }
+
+    /// Taps a Game's card and waits for its setup. Six Games overflow a small
+    /// phone in landscape, and the grid scrolls under the New Match button
+    /// pinned over it, so the card is scrolled clear first. A tap that lands on
+    /// that button anyway opens the Game list instead: it is cancelled and the
+    /// card tried once more, rather than failing on a mistimed scroll.
+    private func tapGameCard(_ game: String) {
+        let card = app.buttons["gameCard.\(game)"]
+        let newMatch = app.buttons["newMatchButton"]
+        XCTAssertTrue(card.waitForExistence(timeout: 10), "No card for \(game)")
+        for attempt in 1...2 {
+            for _ in 0..<5 where card.frame.maxY > newMatch.frame.minY {
+                app.swipeUp()
+            }
+            card.tap()
+            if app.navigationBars[game].waitForExistence(timeout: 5) { return }
+            let cancel = app.buttons["cancelNewMatchButton"]
+            XCTAssertTrue(
+                cancel.exists,
+                "Tapping \(game)'s card opened neither its setup nor the Game list"
+            )
+            cancel.tap()
+            XCTAssertTrue(card.waitForExistence(timeout: 5))
+            XCTAssertEqual(attempt, 1, "\(game)'s card never opened its setup")
+        }
     }
 
     /// A Match tied in play above a Match that ended tied, each row saying so.
@@ -505,6 +543,81 @@ final class FinalScoreUITests: XCTestCase {
 
         XCTAssertEqual(dealer(inRound: 3), "Ada", "The deal passes on from whoever was handed it")
         XCTAssertEqual(dealer(inRound: 1), "Ada", "Earlier Rounds keep their Dealer")
+    }
+
+    /// Belote, the first Game whose Teams hold more than one Player: four seats
+    /// compose two Teams, a swap changes them, and the scorepad scores the Teams
+    /// while the deal still passes Player by Player.
+    private func composeBeloteTeamsAndScoreARound() {
+        setUpMatch("Belote", players: ["Ada", "Grace", "Linus", "Marie"])
+        dismissNameField()
+
+        // Seats alternate, so partners sit across the table from each other.
+        XCTAssertEqual(seat(team: 0, slot: 0).label, "Ada")
+        XCTAssertEqual(seat(team: 0, slot: 1).label, "Linus")
+        XCTAssertEqual(seat(team: 1, slot: 0).label, "Grace")
+        XCTAssertEqual(seat(team: 1, slot: 1).label, "Marie")
+        attachScreenshot(named: "Belote setup, \(orientationName)")
+
+        // Ada would rather play with Grace: swapping their seats changes both Teams.
+        bringIntoReach(seat(team: 0, slot: 1)).tap()
+        let swap = app.buttons["Swap with Grace"]
+        XCTAssertTrue(swap.waitForExistence(timeout: 5))
+        swap.tap()
+        XCTAssertEqual(seat(team: 0, slot: 1).label, "Grace")
+        XCTAssertEqual(seat(team: 1, slot: 0).label, "Linus")
+
+        tapStart()
+
+        // Two columns, one per Team, labelled with their Players.
+        XCTAssertTrue(app.staticTexts["teamName.0"].waitForExistence(timeout: 5))
+        XCTAssertEqual(app.staticTexts["teamName.0"].label, "Ada & Grace")
+        XCTAssertEqual(app.staticTexts["teamName.1"].label, "Linus & Marie")
+        XCTAssertFalse(app.staticTexts["teamName.2"].exists, "Four Players make two columns, not four")
+        XCTAssertFalse(app.buttons["key.sign"].exists, "A Belote Team never scores below 0")
+
+        // A Round splits its 162 points between the two Teams.
+        press("9", "1", "next", "7", "1")
+
+        XCTAssertEqual(total(0), "91")
+        XCTAssertEqual(total(1), "71")
+        XCTAssertTrue(app.images["leader.0"].exists, "Highest Total leads in Belote")
+
+        hideKeypad()
+        XCTAssertEqual(dealer(inRound: 1), "Ada", "Seat 1 deals first")
+
+        app.buttons["newRoundButton"].tap()
+        hideKeypad()
+        XCTAssertEqual(dealer(inRound: 2), "Linus", "The deal passes to seat 2 — a Player on the other Team")
+    }
+
+    /// The Add Player field stays open for the next name; an empty submit puts
+    /// it and the keyboard away, so the rest of the form is in reach.
+    private func dismissNameField() {
+        let field = app.textFields["newPlayerName"]
+        guard field.exists else { return }
+        field.typeText("\n")
+        XCTAssertTrue(field.waitForNonExistence(timeout: 5))
+    }
+
+    private func seat(team: Int, slot: Int) -> XCUIElement {
+        let menu = app.buttons["teamSeat.\(team).\(slot)"]
+        XCTAssertTrue(menu.waitForExistence(timeout: 5), "No seat \(slot) on Team \(team + 1)")
+        return menu
+    }
+
+    /// Scrolls a Form down until the element can be tapped.
+    @discardableResult
+    private func bringIntoReach(_ element: XCUIElement) -> XCUIElement {
+        for _ in 0..<4 where !element.isHittable {
+            app.swipeUp()
+        }
+        XCTAssertTrue(element.isHittable, "\(element.identifier) never came into reach")
+        return element
+    }
+
+    private var orientationName: String {
+        XCUIDevice.shared.orientation.isLandscape ? "landscape" : "portrait"
     }
 
     private func hideKeypad() {

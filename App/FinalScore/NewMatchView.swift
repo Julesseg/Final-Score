@@ -54,7 +54,8 @@ struct NewMatchView: View {
 
 /// The Roster, with a tap to pick each Player into the next seat. Swiping a
 /// Player renames or deletes them; + Add Player meets someone new inline. A
-/// Game that tracks the Dealer also asks which way the deal passes.
+/// Game that tracks the Dealer also asks which way the deal passes, and a Team
+/// Game shows the Teams its seats compose, editable before Start.
 private struct PlayersView: View {
     let roster: PlayerLibrary
     let onStart: (Match) -> Void
@@ -101,6 +102,18 @@ private struct PlayersView: View {
                 Text(setup.game.summary)
             }
 
+            if setup.game.teamPlay != .individual {
+                Section {
+                    ForEach(Array(setup.teams.enumerated()), id: \.offset) { index, players in
+                        teamRow(index, players: players)
+                    }
+                } header: {
+                    Text("Teams")
+                } footer: {
+                    Text(teamsFooter)
+                }
+            }
+
             if setup.game.tracksDealer {
                 Section {
                     Picker("Deal passes", selection: $setup.rotation) {
@@ -142,6 +155,45 @@ private struct PlayersView: View {
                 .disabled(!roster.canRename(player, to: newName))
                 .accessibilityIdentifier("confirmRenameButton")
         }
+    }
+
+    /// One Team and its Players, each a menu that trades them with another
+    /// seat — which is how a Team is changed, since who plays with whom follows
+    /// from where people sit.
+    private func teamRow(_ index: Int, players: [Player]) -> some View {
+        HStack(spacing: 8) {
+            Text("Team \(index + 1)")
+                .font(.subheadline)
+                .foregroundStyle(.secondary)
+            Spacer(minLength: 8)
+            ForEach(Array(players.enumerated()), id: \.element.id) { slot, player in
+                swapMenu(for: player, identifier: "teamSeat.\(index).\(slot)")
+            }
+        }
+    }
+
+    private func swapMenu(for player: Player, identifier: String) -> some View {
+        Menu {
+            ForEach(setup.swapCandidates(for: player.id)) { other in
+                Button("Swap with \(other.name)") {
+                    setup.swapSeats(player.id, other.id)
+                }
+            }
+        } label: {
+            Text(player.name)
+                .lineLimit(1)
+        }
+        .buttonStyle(.bordered)
+        .accessibilityIdentifier(identifier)
+        .accessibilityLabel(player.name)
+        .accessibilityHint("Swaps seats to change the Teams")
+    }
+
+    /// How to finish composing the Teams, or how to re-form the ones composed.
+    private var teamsFooter: String {
+        let swapping = "Seats alternate between Teams, so partners sit across the table. Tap a Player to swap seats and change the Teams."
+        guard !setup.canStart else { return swapping }
+        return "Every Team needs \(setup.game.teamPlay.size) Players before the Match can start. " + swapping
     }
 
     private func row(for player: Player) -> some View {

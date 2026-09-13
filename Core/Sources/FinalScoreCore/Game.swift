@@ -67,6 +67,14 @@ public struct Game: Codable, Hashable, Sendable {
         case individual
         /// Players are grouped into Teams of this size.
         case teams(of: Int)
+
+        /// How many Players sit on one Team.
+        public var size: Int {
+            switch self {
+            case .individual: 1
+            case .teams(let size): size
+            }
+        }
     }
 
     public enum Direction: String, Codable, Hashable, Sendable {

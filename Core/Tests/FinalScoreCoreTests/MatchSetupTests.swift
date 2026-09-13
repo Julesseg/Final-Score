@@ -154,4 +154,138 @@ struct MatchSetupTests {
 
         #expect(setup.rotation == .counterclockwise)
     }
+
+    // MARK: Team Games
+
+    /// Picks everyone, in the order given, into a Belote setup.
+    private func beloteSetup(seating players: [Player]) -> MatchSetup {
+        var setup = MatchSetup(game: .belote, roster: roster, previous: nil)
+        for player in players {
+            setup.pick(player.id)
+        }
+        return setup
+    }
+
+    @Test func aTeamGameSeatsPartnersAcrossTheTableFromEachOther() throws {
+        let setup = beloteSetup(seating: [ada, grace, linus, marie])
+
+        #expect(setup.teams.map { $0.map(\.name) } == [["Ada", "Linus"], ["Grace", "Marie"]])
+        #expect(setup.canStart)
+
+        let match = try #require(setup.makeMatch())
+
+        #expect(match.teams.map(\.name) == ["Ada & Linus", "Grace & Marie"])
+        #expect(
+            match.seating == Seating(order: [ada.id, grace.id, linus.id, marie.id], rotation: .clockwise),
+            "Seats keep the order they were picked in, whoever partners whom"
+        )
+    }
+
+    @Test func theDealStillPassesSeatBySeatInATeamGame() throws {
+        var match = try #require(beloteSetup(seating: [ada, grace, linus, marie]).makeMatch())
+
+        #expect(match.rounds[0].dealer == ada.id)
+        match.setScore(81, for: match.teams[0].id, inRound: match.rounds[0].id)
+        match.startNewRound()
+
+        #expect(match.rounds[1].dealer == grace.id, "The next seat deals, not the next Team")
+    }
+
+    @Test func everyonePlayingIsListedInSeatingOrderNotInTeamOrder() throws {
+        let match = try #require(beloteSetup(seating: [ada, grace, linus, marie]).makeMatch())
+
+        #expect(match.players == [ada, grace, linus, marie])
+    }
+
+    @Test func aTeamGameCannotStartOnHalfATeam() {
+        var setup = MatchSetup(game: .belote, roster: roster, previous: nil)
+
+        setup.pick(ada.id)
+        setup.pick(grace.id)
+        setup.pick(linus.id)
+
+        #expect(!setup.canStart, "Three Players leave Grace and Marie's Team a Player short")
+        #expect(setup.makeMatch() == nil)
+        #expect(setup.teams.map { $0.map(\.name) } == [["Ada", "Linus"], ["Grace"]], "The Teams show as they form")
+
+        setup.pick(marie.id)
+        #expect(setup.canStart)
+        #expect(!setup.canPick(tim.id), "Belote seats four and no more")
+    }
+
+    @Test func swappingTwoSeatsReFormsTheTeamsAroundThem() throws {
+        var setup = beloteSetup(seating: [ada, grace, linus, marie])
+
+        setup.swapSeats(grace.id, linus.id)
+
+        #expect(setup.teams.map { $0.map(\.name) } == [["Ada", "Grace"], ["Linus", "Marie"]])
+        #expect(setup.seat(of: grace.id) == 3)
+        #expect(setup.seat(of: linus.id) == 2)
+
+        let match = try #require(setup.makeMatch())
+        #expect(match.seating?.order == [ada.id, linus.id, grace.id, marie.id])
+    }
+
+    @Test func aPlayerCanOnlyTradeSeatsWithSomeoneOffTheirOwnTeam() {
+        let setup = beloteSetup(seating: [ada, grace, linus, marie])
+
+        #expect(
+            setup.swapCandidates(for: ada.id).map(\.name) == ["Grace", "Marie"],
+            "Trading seats with Linus would leave Ada on the same Team"
+        )
+        #expect(setup.swapCandidates(for: tim.id).isEmpty, "Tim has no seat to trade")
+    }
+
+    @Test func inAnIndividualGameEverySeatIsWorthTradingWith() {
+        var setup = MatchSetup(game: .skyjo, roster: roster, previous: nil)
+        setup.pick(ada.id)
+        setup.pick(grace.id)
+        setup.pick(linus.id)
+
+        #expect(setup.swapCandidates(for: grace.id).map(\.name) == ["Ada", "Linus"])
+    }
+
+    @Test func aRematchOfATeamGameWithoutADealerKeepsTheSameTeams() throws {
+        // No built-in Game is like this yet, but nothing stops one being.
+        var untracked = Game.belote
+        untracked.tracksDealer = false
+        var setup = MatchSetup(game: untracked, roster: roster, previous: nil)
+        for player in [ada, grace, linus, marie] {
+            setup.pick(player.id)
+        }
+        let previous = try #require(setup.makeMatch())
+        #expect(previous.seating == nil)
+
+        let rematch = try #require(
+            MatchSetup(game: untracked, roster: roster, previous: previous).makeMatch()
+        )
+
+        #expect(rematch.teams.map(\.name) == previous.teams.map(\.name))
+    }
+
+    @Test func swappingSeatsWithSomeoneWhoHasNoneLeavesTheTeamsAlone() {
+        var setup = beloteSetup(seating: [ada, grace, linus, marie])
+
+        setup.swapSeats(ada.id, tim.id)
+
+        #expect(setup.seating == [ada.id, grace.id, linus.id, marie.id])
+    }
+
+    @Test func aRematchOfATeamGamePreSelectsEveryoneInTheirSeatingOrder() throws {
+        let previous = try #require(beloteSetup(seating: [ada, grace, linus, marie]).makeMatch())
+
+        let setup = MatchSetup(game: .belote, roster: roster, previous: previous)
+
+        #expect(setup.seating == [ada.id, grace.id, linus.id, marie.id])
+        #expect(setup.teams.map { $0.map(\.name) } == [["Ada", "Linus"], ["Grace", "Marie"]])
+    }
+
+    @Test func anIndividualGameGivesEveryPlayerATeamOfTheirOwn() {
+        var setup = MatchSetup(game: .skyjo, roster: roster, previous: nil)
+        setup.pick(ada.id)
+        setup.pick(grace.id)
+        setup.pick(linus.id)
+
+        #expect(setup.teams.map { $0.map(\.name) } == [["Ada"], ["Grace"], ["Linus"]])
+    }
 }
