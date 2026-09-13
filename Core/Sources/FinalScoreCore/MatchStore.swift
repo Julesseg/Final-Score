@@ -13,7 +13,8 @@ public final class MatchStore {
     private let directory: URL
     private var byID: [Match.ID: Match]
 
-    /// Newest first — the order the Match list shows them in.
+    /// In progress above finished, each newest first — the order the Match list
+    /// shows them in. A finished Match is as new as its end.
     public private(set) var matches: [Match]
 
     /// Opens the store on `directory`, creating it if this is the first launch,
@@ -26,7 +27,7 @@ public final class MatchStore {
         self.directory = directory
         try? FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
         byID = Self.readSnapshots(in: directory)
-        matches = Self.newestFirst(byID.values)
+        matches = Self.listOrder(byID.values)
     }
 
     public func match(id: Match.ID) -> Match? {
@@ -44,7 +45,7 @@ public final class MatchStore {
     /// before the app can be killed — deferring it would trade that away.
     public func save(_ match: Match) throws {
         byID[match.id] = match
-        matches = Self.newestFirst(byID.values)
+        matches = Self.listOrder(byID.values)
         let data = try JSONEncoder().encode(match)
         try data.write(to: url(for: match.id), options: .atomic)
     }
@@ -53,10 +54,15 @@ public final class MatchStore {
         directory.appendingPathComponent("\(id.uuidString).json")
     }
 
-    private static func newestFirst(_ matches: some Collection<Match>) -> [Match] {
-        // The id breaks ties, so Matches started in the same instant still come
-        // back in one stable order.
-        matches.sorted { ($0.startedAt, $0.id.uuidString) > ($1.startedAt, $1.id.uuidString) }
+    private static func listOrder(_ matches: some Collection<Match>) -> [Match] {
+        // A finished Match counts as new from when it ended, so the one just
+        // finished heads its section. The id breaks ties, so Matches from the
+        // same instant still come back in one stable order.
+        matches.sorted {
+            if $0.isEnded != $1.isEnded { return !$0.isEnded }
+            let (lhs, rhs) = ($0.endedAt ?? $0.startedAt, $1.endedAt ?? $1.startedAt)
+            return (lhs, $0.id.uuidString) > (rhs, $1.id.uuidString)
+        }
     }
 
     /// Reads what it can. A snapshot this version can't decode is skipped, so

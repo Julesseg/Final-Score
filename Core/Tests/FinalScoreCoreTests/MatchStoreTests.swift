@@ -89,6 +89,39 @@ final class MatchStoreTests {
         #expect(MatchStore(directory: directory).matches.map(\.id) == [newest.id, middle.id, oldest.id])
     }
 
+    @Test func matchesInProgressAreListedAboveFinishedOnes() throws {
+        let store = MatchStore(directory: directory)
+        var finishedFirst = skyjoMatch(startedAt: Date(timeIntervalSince1970: 3_000))
+        let playingOld = skyjoMatch(startedAt: Date(timeIntervalSince1970: 1_000))
+        var finishedLast = skyjoMatch(startedAt: Date(timeIntervalSince1970: 2_000))
+        let playingNew = skyjoMatch(startedAt: Date(timeIntervalSince1970: 4_000))
+        finishedFirst.end(at: Date(timeIntervalSince1970: 5_000))
+        finishedLast.end(at: Date(timeIntervalSince1970: 6_000))
+
+        for match in [finishedFirst, playingOld, finishedLast, playingNew] {
+            try store.save(match)
+        }
+
+        // In progress newest started first; finished most recently ended first.
+        let expected = [playingNew.id, playingOld.id, finishedLast.id, finishedFirst.id]
+        #expect(store.matches.map(\.id) == expected)
+        #expect(MatchStore(directory: directory).matches.map(\.id) == expected)
+    }
+
+    @Test func endingAMatchMovesItBelowTheMatchesStillInProgress() throws {
+        let store = MatchStore(directory: directory)
+        var newest = skyjoMatch(startedAt: Date(timeIntervalSince1970: 2_000))
+        let older = skyjoMatch(startedAt: Date(timeIntervalSince1970: 1_000))
+        try store.save(older)
+        try store.save(newest)
+        #expect(store.matches.map(\.id) == [newest.id, older.id])
+
+        newest.end()
+        try store.save(newest)
+
+        #expect(store.matches.map(\.id) == [older.id, newest.id])
+    }
+
     @Test func aSnapshotTheStoreCannotReadIsSkippedRatherThanLosingTheRest() throws {
         let match = skyjoMatch()
         try MatchStore(directory: directory).save(match)

@@ -10,11 +10,12 @@ struct MatchListView: View {
 
     var body: some View {
         NavigationStack(path: $path) {
-            List(library.matches) { match in
-                NavigationLink(value: match.id) {
-                    MatchRow(match: match)
-                }
-                .accessibilityIdentifier("matchRow")
+            // The library already lists in-progress Matches above finished ones.
+            let inProgress = library.matches.filter { !$0.isEnded }
+            let finished = library.matches.filter(\.isEnded)
+            List {
+                section("In Progress", inProgress)
+                section("Finished", finished)
             }
             .overlay {
                 if library.matches.isEmpty {
@@ -49,6 +50,20 @@ struct MatchListView: View {
             }
         }
     }
+
+    @ViewBuilder
+    private func section(_ title: String, _ matches: [Match]) -> some View {
+        if !matches.isEmpty {
+            Section(title) {
+                ForEach(matches) { match in
+                    NavigationLink(value: match.id) {
+                        MatchRow(match: match)
+                    }
+                    .accessibilityIdentifier("matchRow")
+                }
+            }
+        }
+    }
 }
 
 private struct MatchRow: View {
@@ -64,12 +79,18 @@ private struct MatchRow: View {
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
                     .lineLimit(1)
-                Text("In progress · Round \(match.rounds.count)")
+                Text(status)
                     .font(.caption)
                     .foregroundStyle(.secondary)
                     .accessibilityIdentifier("matchStatus")
             }
         }
         .padding(.vertical, 2)
+    }
+
+    /// "In progress · Round 3", "Finished · Grace wins"
+    private var status: String {
+        guard match.isEnded else { return "In progress · Round \(match.rounds.count)" }
+        return ["Finished", match.outcomeText].compactMap(\.self).joined(separator: " · ")
     }
 }

@@ -164,6 +164,94 @@ final class FinalScoreUITests: XCTestCase {
         attachScreenshot(named: "Quick scores, landscape")
     }
 
+    func testSkyjoAnnouncesATotalCrossing100AndTheLowestTotalWins() throws {
+        launch()
+        // An older Match left in progress, to be listed above the finished one.
+        startMatch("Skyjo", players: ["Linus", "Marie"])
+        press("4")
+        backToList()
+
+        startMatch("Skyjo", players: ["Ada", "Grace"])
+        press("1", "0", "4", "next", "9", "next")
+
+        let notice = element("endConditionNotice")
+        XCTAssertTrue(notice.waitForExistence(timeout: 5), "Ada crossing 100 is announced")
+        XCTAssertTrue(notice.label.contains("Grace would win"))
+
+        // Scoring past the End condition stays possible.
+        press("3")
+        XCTAssertEqual(total(0), "107")
+        XCTAssertTrue(notice.exists)
+        attachScreenshot(named: "End condition announced, portrait")
+
+        app.buttons["endMatchFromNotice"].tap()
+        confirmEndMatch()
+
+        let outcome = element("outcome")
+        XCTAssertTrue(outcome.waitForExistence(timeout: 5))
+        XCTAssertTrue(outcome.label.contains("Grace wins"))
+        XCTAssertFalse(app.buttons["key.next"].exists, "Ending puts the keypad away")
+
+        backToList()
+
+        let rows = app.buttons.matching(identifier: "matchRow")
+        XCTAssertTrue(rows.element(boundBy: 1).waitForExistence(timeout: 5))
+        XCTAssertTrue(rows.element(boundBy: 0).label.contains("Linus"), "In progress is listed above finished")
+        XCTAssertTrue(rows.element(boundBy: 1).label.contains("Ada"))
+        XCTAssertTrue(rows.element(boundBy: 1).label.contains("Finished"))
+        XCTAssertTrue(rows.element(boundBy: 1).label.contains("Grace wins"))
+    }
+
+    func testEndingAMatchInLandscape() throws {
+        launch(in: .landscapeLeft)
+        startMatch("Skyjo", players: ["Ada", "Grace", "Linus"])
+        press("1", "0", "6", "next", "4", "next", "4", "next")
+
+        let notice = element("endConditionNotice")
+        XCTAssertTrue(notice.waitForExistence(timeout: 5), "The announcement shows in landscape too")
+        XCTAssertTrue(notice.label.contains("Grace and Linus would tie"))
+        XCTAssertTrue(app.buttons["endMatchFromNotice"].isHittable)
+        attachScreenshot(named: "End condition announced, landscape")
+
+        // Ending manually from the toolbar works too.
+        let endMatch = app.buttons["endMatchButton"]
+        XCTAssertTrue(endMatch.waitForExistence(timeout: 5))
+        endMatch.tap()
+        confirmEndMatch()
+
+        let outcome = element("outcome")
+        XCTAssertTrue(outcome.waitForExistence(timeout: 5))
+        XCTAssertTrue(outcome.label.contains("Grace and Linus tie"))
+        XCTAssertFalse(endMatch.exists)
+        attachScreenshot(named: "Match ended, landscape")
+
+        // Correcting an old Score corrects the Winner.
+        app.buttons["score.1.1"].tap()
+        press("7")
+        XCTAssertTrue(outcome.label.contains("Linus wins"))
+
+        backToList()
+        let row = app.buttons["matchRow"]
+        XCTAssertTrue(row.waitForExistence(timeout: 5))
+        XCTAssertTrue(row.label.contains("Finished"))
+        XCTAssertTrue(row.label.contains("Linus wins"))
+        attachScreenshot(named: "Match list, landscape")
+    }
+
+    func testAMatchCanBeEndedBeforeItsEndCondition() throws {
+        launch()
+        startMatch("Skyjo", players: ["Ada", "Grace"])
+        press("6", "next", "4")
+
+        app.buttons["endMatchButton"].tap()
+        confirmEndMatch()
+
+        let outcome = element("outcome")
+        XCTAssertTrue(outcome.waitForExistence(timeout: 5))
+        XCTAssertTrue(outcome.label.contains("Grace wins"))
+        XCTAssertFalse(element("endConditionNotice").exists)
+    }
+
     // MARK: Helpers
 
     /// Tarot's Quick scores in order, one nudged by ±1, and the keypad taking
@@ -245,6 +333,8 @@ final class FinalScoreUITests: XCTestCase {
 
     private func backToList() {
         app.navigationBars.buttons.element(boundBy: 0).tap()
+        // Wait out the pop, so the next tap lands on the list rather than mid-transition.
+        XCTAssertTrue(app.navigationBars["Matches"].waitForExistence(timeout: 5))
     }
 
     private func press(_ keys: String...) {
@@ -253,6 +343,17 @@ final class FinalScoreUITests: XCTestCase {
             XCTAssertTrue(button.waitForExistence(timeout: 5), "No key \(key)")
             button.tap()
         }
+    }
+
+    private func confirmEndMatch() {
+        let confirm = app.alerts.buttons["End Match"]
+        XCTAssertTrue(confirm.waitForExistence(timeout: 5))
+        confirm.tap()
+    }
+
+    /// An element by identifier, whatever type its combined children expose it as.
+    private func element(_ identifier: String) -> XCUIElement {
+        app.descendants(matching: .any)[identifier].firstMatch
     }
 
     private func total(_ teamIndex: Int) -> String {
