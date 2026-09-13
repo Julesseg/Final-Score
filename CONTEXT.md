@@ -46,6 +46,11 @@ The order Players sit around the table, set at Match setup. The Dealer advances
 along it each Round, in whichever rotation the Match is set to.
 _Avoid_: turn order, player order, rotation
 
+**Rotation**:
+Which way the deal passes around the table — clockwise, to the next seat in the
+Seating order, or counter-clockwise, to the previous one. Set at Match setup.
+_Avoid_: direction (Direction is whether the highest or lowest Total wins)
+
 ### Scoring
 
 **Structure**:

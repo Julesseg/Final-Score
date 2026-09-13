@@ -133,6 +133,11 @@ public struct Scorepad: Sendable {
         match.end()
     }
 
+    /// Reassigns who deals a Round. The keypad stays where it is.
+    public mutating func setDealer(_ player: Player.ID, inRound round: Round.ID) {
+        match.setDealer(player, inRound: round)
+    }
+
     private var teamAfterSelection: Team.ID? {
         guard let selection,
               let index = match.teams.firstIndex(where: { $0.id == selection.team }),

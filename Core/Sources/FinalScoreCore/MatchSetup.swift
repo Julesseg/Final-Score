@@ -1,6 +1,7 @@
 import Foundation
 
-/// The New Match form: a Game, and the Players from the Roster who will play it.
+/// The New Match form: a Game, the Players from the Roster who will play it,
+/// and — for a Game that tracks the Dealer — which way the deal passes.
 public struct MatchSetup: Sendable {
     public let game: Game
     /// Everyone who could be picked. Handing it a roster that has lost a
@@ -12,11 +13,13 @@ public struct MatchSetup: Sendable {
     }
     /// The picked Players, in Seating order.
     public private(set) var seating: [Player.ID]
+    /// Which way the deal passes. Only a Game that tracks the Dealer uses it.
+    public var rotation: Seating.Rotation
 
     /// Opens with the `previous` Match's Players already picked, in the same
     /// Seating order, so a repeat game night is one tap. Anyone since deleted
     /// from the roster is left out, and so is anyone past the most Players
-    /// this Game allows.
+    /// this Game allows. The deal passes the way it did last time, or clockwise.
     public init(game: Game, roster: [Player], previous: Match?) {
         self.game = game
         self.roster = roster
@@ -26,6 +29,7 @@ public struct MatchSetup: Sendable {
                 .map(\.id)
                 .prefix(game.playerCount.upperBound)
         )
+        rotation = previous?.seating?.rotation ?? .clockwise
     }
 
     /// The Player's 1-based seat, or nil while they aren't picked.
@@ -61,12 +65,17 @@ public struct MatchSetup: Sendable {
 
     /// The Match these Players start, each as a Team of one in Seating order;
     /// nil until `canStart`. The Match takes its own copy of every Player, so
-    /// later Roster edits never reach it.
+    /// later Roster edits never reach it. A Game that tracks the Dealer also
+    /// fixes the Seating order and rotation, with the first seat dealing.
     public func makeMatch() -> Match? {
         guard canStart else { return nil }
         let teams = seating
             .compactMap { id in roster.first { $0.id == id } }
             .map { Team(players: [$0]) }
-        return Match(game: game, teams: teams)
+        return Match(
+            game: game,
+            teams: teams,
+            seating: game.tracksDealer ? Seating(order: seating, rotation: rotation) : nil
+        )
     }
 }

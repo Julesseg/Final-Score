@@ -41,7 +41,8 @@ struct NewMatchView: View {
 }
 
 /// The Roster, with a tap to pick each Player into the next seat. Swiping a
-/// Player renames or deletes them; + Add Player meets someone new inline.
+/// Player renames or deletes them; + Add Player meets someone new inline. A
+/// Game that tracks the Dealer also asks which way the deal passes.
 private struct PlayersView: View {
     let roster: PlayerLibrary
     let onStart: (Match) -> Void
@@ -86,6 +87,21 @@ private struct PlayersView: View {
                 Text("Players")
             } footer: {
                 Text(setup.game.summary)
+            }
+
+            if setup.game.tracksDealer {
+                Section {
+                    Picker("Deal passes", selection: $setup.rotation) {
+                        Text("Clockwise").tag(Seating.Rotation.clockwise)
+                        Text("Counter-clockwise").tag(Seating.Rotation.counterclockwise)
+                    }
+                    .pickerStyle(.segmented)
+                    .accessibilityIdentifier("rotationPicker")
+                } header: {
+                    Text("Dealer")
+                } footer: {
+                    Text("Pick Players in the order they sit, going clockwise. Seat 1 deals first, then the deal passes one seat each Round.")
+                }
             }
         }
         .navigationTitle(setup.game.name)

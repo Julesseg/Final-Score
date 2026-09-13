@@ -63,6 +63,40 @@ final class MatchStoreTests {
         #expect(restored.totalsArePartial)
     }
 
+    @Test func theSeatingAndEachRoundsDealerAreRestored() throws {
+        let players = [Player(name: "Ada"), Player(name: "Grace")]
+        var match = Match(
+            game: .skyjo,
+            teams: players.map { Team(players: [$0]) },
+            seating: Seating(order: players.map(\.id), rotation: .counterclockwise)
+        )
+        match.setScore(4, for: match.teams[0].id, inRound: match.rounds[0].id)
+        match.startNewRound()
+        match.setDealer(players[0].id, inRound: match.rounds[1].id)
+        try MatchStore(directory: directory).save(match)
+
+        let restored = try #require(MatchStore(directory: directory).matches.first)
+
+        #expect(restored.seating == match.seating)
+        #expect(restored.rounds.map(\.dealer) == [players[0].id, players[0].id])
+    }
+
+    @Test func aMatchSavedBeforeDealersWereTrackedStillOpens() throws {
+        let match = skyjoMatch()
+        let snapshot = """
+            {"id":"\(match.id.uuidString)","startedAt":0,"game":\(String(decoding: try JSONEncoder().encode(Game.skyjo), as: UTF8.self)),
+             "teams":\(String(decoding: try JSONEncoder().encode(match.teams), as: UTF8.self)),
+             "rounds":[{"id":"\(UUID().uuidString)","scores":[]}]}
+            """
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        try Data(snapshot.utf8).write(to: directory.appendingPathComponent("\(match.id.uuidString).json"))
+
+        let restored = try #require(MatchStore(directory: directory).matches.first)
+
+        #expect(restored.seating == nil)
+        #expect(restored.rounds.map(\.dealer) == [nil])
+    }
+
     @Test func savingAMatchAgainReplacesItsSnapshotRatherThanAddingOne() throws {
         let store = MatchStore(directory: directory)
         var match = skyjoMatch()

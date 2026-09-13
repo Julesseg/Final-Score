@@ -4,7 +4,8 @@ import FinalScoreCore
 /// The paper scorepad: one column per Team, one row per Round, Totals along
 /// the bottom. Tapping a Score opens the keypad on it, however old the Round;
 /// swiping a Round, or its menu, deletes it. What each gesture and key does is
-/// `Scorepad`'s business, in Core.
+/// `Scorepad`'s business, in Core. In a Game that tracks the Dealer, a badge
+/// marks who deals each Round, and tapping it hands the deal to someone else.
 struct ScorepadView: View {
     @Binding var match: Match
     @State private var scorepad: Scorepad
@@ -243,6 +244,39 @@ struct ScorepadView: View {
         .accessibilityIdentifier("score.\(roundNumber).\(teamIndex)")
         .accessibilityLabel("\(team.name), Round \(roundNumber)")
         .accessibilityValue(points.map(String.init) ?? "Not scored")
+        .overlay(alignment: .topLeading) {
+            if let dealer = team.players.first(where: { $0.id == round.dealer }) {
+                dealerBadge(dealer, in: round, roundNumber: roundNumber)
+            }
+        }
+    }
+
+    /// Marks the Round's Dealer. Tapping it picks someone else to deal — a
+    /// misdeal, or "the loser deals" — and later Rounds pass the deal on from them.
+    private func dealerBadge(_ dealer: Player, in round: Round, roundNumber: Int) -> some View {
+        let choice = Binding<Player.ID>(
+            get: { dealer.id },
+            set: { scorepad.setDealer($0, inRound: round.id) }
+        )
+        return Menu {
+            Picker("Who deals Round \(roundNumber)?", selection: choice) {
+                ForEach(scorepad.match.players) { player in
+                    Text(player.name).tag(player.id)
+                }
+            }
+            .pickerStyle(.inline)
+        } label: {
+            Text("D")
+                .font(.caption2.bold())
+                .foregroundStyle(.white)
+                .frame(width: 18, height: 18)
+                .background(.tint, in: Circle())
+                .frame(width: 30, height: 30)
+                .contentShape(Rectangle())
+        }
+        .accessibilityIdentifier("dealer.\(roundNumber)")
+        .accessibilityLabel("Dealer, Round \(roundNumber)")
+        .accessibilityValue(dealer.name)
     }
 
     private func totals(columnWidth: CGFloat) -> some View {
