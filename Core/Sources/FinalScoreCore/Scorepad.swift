@@ -19,10 +19,14 @@ public struct Scorepad: Sendable {
     public private(set) var selection: Position?
     private var typed = Override()
 
-    /// Opens on the first Team still unscored in the last Round, if any.
+    /// Opens on the first Team still unscored in the last Round, if any — or
+    /// with the keypad away on an ended Match, which is only reopened to look
+    /// at or to correct.
     public init(match: Match) {
         self.match = match
-        selectFirstUnscoredTeam()
+        if !match.isEnded {
+            selectFirstUnscoredTeam()
+        }
     }
 
     public var keypadText: String {
@@ -76,13 +80,14 @@ public struct Scorepad: Sendable {
         case nextTeam
         /// Starts a new Round, after the last Team of the last Round.
         case newRound
-        /// Puts the keypad away, after the last Team of an earlier Round.
+        /// Puts the keypad away, after the last Team of an earlier Round or of
+        /// an ended Match.
         case done
     }
 
     public var nextStep: NextStep {
         if teamAfterSelection != nil { return .nextTeam }
-        return selection?.round == match.rounds.last?.id ? .newRound : .done
+        return !match.isEnded && selection?.round == match.rounds.last?.id ? .newRound : .done
     }
 
     /// Lands the selected Score — a Team left untouched gets an explicit 0,
@@ -107,6 +112,13 @@ public struct Scorepad: Sendable {
     public mutating func startNewRound() {
         match.startNewRound()
         selectFirstUnscoredTeam()
+    }
+
+    /// Ends the Match and puts the keypad away. Any Score can still be selected
+    /// and corrected afterwards.
+    public mutating func endMatch() {
+        deselect()
+        match.end()
     }
 
     private var teamAfterSelection: Team.ID? {
