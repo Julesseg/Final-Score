@@ -607,6 +607,7 @@ final class FinalScoreUITests: XCTestCase {
         XCTAssertEqual(total(1), "0")
         hideKeypad()
         XCTAssertEqual(dealer(inRound: 1), "Ada", "The same first seat deals")
+        attachScreenshot(named: "Rematch in play, \(orientationName)")
 
         backToList()
         let rows = app.buttons.matching(identifier: "matchRow")
@@ -615,6 +616,7 @@ final class FinalScoreUITests: XCTestCase {
         let statuses = app.staticTexts.matching(identifier: "matchStatus")
         XCTAssertEqual(statuses.element(boundBy: 0).label, "Round 1")
         XCTAssertEqual(statuses.element(boundBy: 1).label, "Ada & Grace won · 91", "The finished Match is untouched")
+        attachScreenshot(named: "Match list after a Rematch, \(orientationName)")
     }
 
     /// With no Matches, every built-in Game is a card, New Match sits at the
