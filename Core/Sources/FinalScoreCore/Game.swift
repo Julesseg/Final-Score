@@ -51,7 +51,7 @@ public struct Game: Codable, Hashable, Sendable {
     }
 
     /// A named colour; the app decides how each one renders.
-    public enum AccentToken: String, Codable, Hashable, Sendable {
+    public enum AccentToken: String, CaseIterable, Codable, Hashable, Sendable {
         case red, orange, yellow, green, mint, teal, cyan, blue, indigo, purple, pink
     }
 

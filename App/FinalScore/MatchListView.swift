@@ -6,6 +6,7 @@ import FinalScoreCore
 struct MatchListView: View {
     let library: MatchLibrary
     let roster: PlayerLibrary
+    let games: GameLibrary
     @State private var path: [Match.ID] = []
     @State private var newMatch: NewMatchRequest?
 
@@ -13,7 +14,7 @@ struct MatchListView: View {
         NavigationStack(path: $path) {
             Group {
                 if library.matches.isEmpty {
-                    GameCards { newMatch = NewMatchRequest(game: $0) }
+                    GameCards(games: games.allGames) { newMatch = NewMatchRequest(game: $0) }
                 } else {
                     matchList
                 }
@@ -49,7 +50,7 @@ struct MatchListView: View {
                 }
             }
             .sheet(item: $newMatch) { request in
-                NewMatchView(roster: roster, previous: library.lastStarted, game: request.game) { match in
+                NewMatchView(roster: roster, games: games, previous: library.lastStarted, game: request.game) { match in
                     library.save(match)
                     newMatch = nil
                     path = [match.id]
@@ -90,8 +91,10 @@ private struct NewMatchRequest: Identifiable {
     let game: Game?
 }
 
-/// The built-in Games as cards, for a first launch with nothing played yet.
+/// The Games as cards, built-ins first, for a first launch with nothing played
+/// yet.
 private struct GameCards: View {
+    let games: [Game]
     let onChoose: (Game) -> Void
 
     var body: some View {
@@ -100,7 +103,7 @@ private struct GameCards: View {
                 Text("Pick a Game to start scoring")
                     .font(.title3.weight(.semibold))
                 LazyVGrid(columns: [GridItem(.adaptive(minimum: 160), spacing: 12)], spacing: 12) {
-                    ForEach(Game.builtIns, id: \.name) { game in
+                    ForEach(games, id: \.name) { game in
                         Button { onChoose(game) } label: {
                             GameCard(game: game)
                         }

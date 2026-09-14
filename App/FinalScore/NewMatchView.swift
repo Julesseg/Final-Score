@@ -1,20 +1,30 @@
 import SwiftUI
 import FinalScoreCore
 
-/// New Match: pick a Game, then pick its Players from the Roster.
+/// New Match: pick a Game, then pick its Players from the Roster. The custom
+/// Games are listed below the built-ins, and authored from here too.
 struct NewMatchView: View {
     let roster: PlayerLibrary
+    let games: GameLibrary
     /// The most recent Match, whose Players come pre-picked.
     let previous: Match?
     let onStart: (Match) -> Void
     /// The Game picked, once past the list of Games.
     @State private var path: [Game]
+    @State private var gameForm: GameFormRequest?
     @Environment(\.dismiss) private var dismiss
 
     /// Opens on the `game`'s Players when it is already chosen, with the list
     /// of Games still one step back.
-    init(roster: PlayerLibrary, previous: Match?, game: Game? = nil, onStart: @escaping (Match) -> Void) {
+    init(
+        roster: PlayerLibrary,
+        games: GameLibrary,
+        previous: Match?,
+        game: Game? = nil,
+        onStart: @escaping (Match) -> Void
+    ) {
         self.roster = roster
+        self.games = games
         self.previous = previous
         self.onStart = onStart
         _path = State(initialValue: game.map { [$0] } ?? [])
@@ -22,20 +32,47 @@ struct NewMatchView: View {
 
     var body: some View {
         NavigationStack(path: $path) {
-            List(Game.builtIns, id: \.name) { game in
-                NavigationLink(value: game) {
-                    HStack(spacing: 12) {
-                        GameSymbol(game: game)
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text(game.name)
-                                .font(.headline)
-                            Text(game.summary)
-                                .font(.subheadline)
-                                .foregroundStyle(.secondary)
+            List {
+                Section {
+                    ForEach(Game.builtIns, id: \.name) { game in
+                        row(for: game)
+                            // Built-ins are read-only: editing one starts from a copy.
+                            .contextMenu {
+                                Button("Duplicate & Edit", systemImage: "plus.square.on.square") {
+                                    gameForm = GameFormRequest(draft: games.duplicate(game), editing: nil)
+                                }
+                                .accessibilityIdentifier("duplicateGameButton")
+                            }
+                    }
+                }
+
+                if !games.customGames.isEmpty {
+                    Section("Your Games") {
+                        ForEach(games.customGames) { custom in
+                            row(for: custom.game)
+                                // No full swipe, as on the Roster: a stray
+                                // swipe shouldn't delete a Game.
+                                .swipeActions(allowsFullSwipe: false) {
+                                    Button("Delete", systemImage: "trash", role: .destructive) {
+                                        games.delete(custom.id)
+                                    }
+                                    Button("Edit", systemImage: "pencil") {
+                                        gameForm = GameFormRequest(draft: GameDraft(game: custom.game), editing: custom.id)
+                                    }
+                                    .tint(.orange)
+                                }
                         }
                     }
                 }
-                .accessibilityIdentifier("game.\(game.name)")
+
+                Section {
+                    Button("Create Game", systemImage: "plus") {
+                        gameForm = GameFormRequest(draft: GameDraft(), editing: nil)
+                    }
+                    .accessibilityIdentifier("createGameButton")
+                } footer: {
+                    Text("Long-press a built-in Game to make an editable copy of it.")
+                }
             }
             .navigationTitle("Choose a Game")
             .navigationBarTitleDisplayMode(.inline)
@@ -48,7 +85,26 @@ struct NewMatchView: View {
                         .accessibilityIdentifier("cancelNewMatchButton")
                 }
             }
+            .sheet(item: $gameForm) { request in
+                GameFormView(games: games, request: request)
+            }
         }
+    }
+
+    private func row(for game: Game) -> some View {
+        NavigationLink(value: game) {
+            HStack(spacing: 12) {
+                GameSymbol(game: game)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(game.name)
+                        .font(.headline)
+                    Text(game.summary)
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                }
+            }
+        }
+        .accessibilityIdentifier("game.\(game.name)")
     }
 }
 
