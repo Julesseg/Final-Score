@@ -43,20 +43,39 @@ struct MatchListView: View {
                         get: { library.match(id: id) ?? match },
                         set: { library.save($0) }
                     )
-                    switch match.game.structure {
-                    case .rounds: ScorepadView(match: binding)
-                    case .tally: TallyView(match: binding)
+                    let rematch = { newMatch = NewMatchRequest(rematching: binding.wrappedValue) }
+                    // Keyed on the Match, so a Rematch opened in place of the
+                    // finished Match starts from its own state rather than the
+                    // finished one's.
+                    Group {
+                        switch match.game.structure {
+                        case .rounds: ScorepadView(match: binding, onRematch: rematch)
+                        case .tally: TallyView(match: binding, onRematch: rematch)
+                        }
                     }
-                }
-            }
-            .sheet(item: $newMatch) { request in
-                NewMatchView(roster: roster, games: games, previous: library.lastStarted, game: request.game) { match in
-                    library.save(match)
-                    newMatch = nil
-                    path = [match.id]
+                    .id(id)
                 }
             }
         }
+        // On the stack rather than its root, so a Rematch asked for from a
+        // pushed Match presents too.
+        .sheet(item: $newMatch) { request in
+            NewMatchView(
+                roster: roster,
+                games: games,
+                previous: request.rematching ?? library.lastStarted,
+                game: request.game,
+                onStart: start
+            )
+        }
+    }
+
+    /// Keeps the Match just set up and opens its scorepad in place of
+    /// whatever was open, a finished Match included.
+    private func start(_ match: Match) {
+        library.save(match)
+        newMatch = nil
+        path = [match.id]
     }
 
     private var matchList: some View {
@@ -84,11 +103,24 @@ struct MatchListView: View {
     }
 }
 
-/// A New Match being set up: from the button, with no Game yet, or from a
-/// Game's card.
+/// A New Match being set up: from the button, with no Game yet, from a Game's
+/// card, or as a Rematch of a finished Match.
 private struct NewMatchRequest: Identifiable {
     let id = UUID()
     let game: Game?
+    /// The finished Match whose Game, Teams, Seating order and rotation the
+    /// setup opens on. Its own copy of the Game, not the built-in.
+    let rematching: Match?
+
+    init(game: Game?) {
+        self.game = game
+        rematching = nil
+    }
+
+    init(rematching finished: Match) {
+        game = finished.game
+        rematching = finished
+    }
 }
 
 /// The Games as cards, built-ins first, for a first launch with nothing played

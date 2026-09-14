@@ -506,6 +506,16 @@ final class FinalScoreUITests: XCTestCase {
         XCTAssertTrue(element("endConditionNotice").exists, "Its target is still 50")
     }
 
+    func testRematchingAFinishedMatchSetsUpTheSameTeamsWithNoScores() throws {
+        launch()
+        rematchAFinishedBeloteMatch()
+    }
+
+    func testRematchWorksInLandscape() throws {
+        launch(in: .landscapeLeft)
+        rematchAFinishedBeloteMatch()
+    }
+
     // MARK: Helpers
 
     /// Opens the Game picker from New Match.
@@ -549,6 +559,64 @@ final class FinalScoreUITests: XCTestCase {
         field.coordinate(withNormalizedOffset: CGVector(dx: 0.98, dy: 0.5)).tap()
         let length = (field.value as? String)?.count ?? 0
         field.typeText(String(repeating: XCUIKeyboardKey.delete.rawValue, count: length) + text)
+    }
+
+    /// A Belote Match with swapped Teams and a counter-clockwise deal, ended
+    /// and rematched: setup opens on the same Teams, Seating and rotation with
+    /// Start ready, and the new Match starts from nothing while the finished
+    /// one keeps its Scores.
+    private func rematchAFinishedBeloteMatch() {
+        setUpMatch("Belote", players: ["Ada", "Grace", "Linus", "Marie"])
+        dismissNameField()
+        bringIntoReach(seat(team: 0, slot: 1)).tap()
+        let swap = app.buttons["Swap with Grace"]
+        XCTAssertTrue(swap.waitForExistence(timeout: 5))
+        swap.tap()
+        bringIntoReach(app.segmentedControls["rotationPicker"]).buttons["Counter-clockwise"].tap()
+        tapStart()
+
+        press("9", "1", "next", "7", "1")
+        app.buttons["endMatchButton"].tap()
+        confirmEndMatch()
+        XCTAssertTrue(element("outcome").waitForExistence(timeout: 5))
+        let rematch = app.buttons["rematchButton"]
+        XCTAssertTrue(rematch.waitForExistence(timeout: 5), "A finished Match offers a Rematch")
+        XCTAssertTrue(rematch.isHittable)
+        attachScreenshot(named: "Rematch offered, \(orientationName)")
+        rematch.tap()
+
+        XCTAssertTrue(app.navigationBars["Belote"].waitForExistence(timeout: 5), "Setup opens on the same Game")
+        XCTAssertTrue(app.buttons["player.Ada"].waitForExistence(timeout: 5))
+        bringIntoReach(app.buttons["teamSeat.1.1"])
+        XCTAssertEqual(seat(team: 0, slot: 0).label, "Ada")
+        XCTAssertEqual(seat(team: 0, slot: 1).label, "Grace")
+        XCTAssertEqual(seat(team: 1, slot: 0).label, "Linus")
+        XCTAssertEqual(seat(team: 1, slot: 1).label, "Marie")
+        XCTAssertTrue(app.buttons["startMatchButton"].isEnabled, "Same again is one tap")
+        let counterclockwise = bringIntoReach(app.segmentedControls["rotationPicker"]).buttons["Counter-clockwise"]
+        XCTAssertTrue(counterclockwise.isSelected, "The deal passes the same way")
+        attachScreenshot(named: "Rematch setup, \(orientationName)")
+        app.buttons["startMatchButton"].tap()
+
+        // The finished Match's scorepad sits behind setup until the Rematch replaces it.
+        XCTAssertTrue(app.buttons["rematchButton"].waitForNonExistence(timeout: 5), "The Rematch opens in play")
+
+        XCTAssertEqual(app.staticTexts["teamName.0"].label, "Ada & Grace")
+        XCTAssertEqual(app.staticTexts["teamName.1"].label, "Linus & Marie")
+        XCTAssertEqual(total(0), "0", "Scores never carry over")
+        XCTAssertEqual(total(1), "0")
+        hideKeypad()
+        XCTAssertEqual(dealer(inRound: 1), "Ada", "The same first seat deals")
+        attachScreenshot(named: "Rematch in play, \(orientationName)")
+
+        backToList()
+        let rows = app.buttons.matching(identifier: "matchRow")
+        XCTAssertTrue(rows.element(boundBy: 1).waitForExistence(timeout: 5))
+        XCTAssertEqual(rows.count, 2, "The Rematch is a Match of its own")
+        let statuses = app.staticTexts.matching(identifier: "matchStatus")
+        XCTAssertEqual(statuses.element(boundBy: 0).label, "Round 1")
+        XCTAssertEqual(statuses.element(boundBy: 1).label, "Ada & Grace won · 91", "The finished Match is untouched")
+        attachScreenshot(named: "Match list after a Rematch, \(orientationName)")
     }
 
     /// With no Matches, every built-in Game is a card, New Match sits at the
@@ -834,11 +902,14 @@ final class FinalScoreUITests: XCTestCase {
         return menu
     }
 
-    /// Scrolls a Form down until the element can be tapped.
+    /// Scrolls a Form down until the element can be tapped. A Form only builds
+    /// the rows on screen, so the element may not exist until it is scrolled
+    /// to. A held drag rather than a swipe, which on a landscape sheet can pull
+    /// the sheet away instead.
     @discardableResult
     private func bringIntoReach(_ element: XCUIElement) -> XCUIElement {
-        for _ in 0..<4 where !element.isHittable {
-            app.swipeUp()
+        for _ in 0..<4 where !(element.exists && element.isHittable) {
+            dragContentUp()
         }
         XCTAssertTrue(element.isHittable, "\(element.identifier) never came into reach")
         return element
