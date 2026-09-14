@@ -396,7 +396,160 @@ final class FinalScoreUITests: XCTestCase {
         attachScreenshot(named: "Match list with ties, landscape")
     }
 
+    func testACustomGameIsCreatedKeptAndStartsAMatch() throws {
+        launch()
+        openGamePicker()
+        tapInList(app.buttons["createGameButton"])
+
+        let save = app.buttons["saveGameButton"]
+        XCTAssertTrue(save.waitForExistence(timeout: 5))
+        XCTAssertFalse(save.isEnabled, "A Game needs a name")
+        let name = app.textFields["gameName"]
+        name.tap()
+        name.typeText("skyjo")
+        XCTAssertFalse(save.isEnabled, "A built-in already goes by that name")
+        name.typeText(String(repeating: XCUIKeyboardKey.delete.rawValue, count: 5) + "Uno\n")
+        XCTAssertTrue(save.isEnabled)
+
+        let quickScore = dragFormToReveal(app.textFields["newQuickScore"])
+        quickScore.tap()
+        quickScore.typeText("50\n")
+        quickScore.typeText("20\n")
+        XCTAssertTrue(app.staticTexts["customQuickScore.20"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.staticTexts["customQuickScore.50"].exists)
+        attachScreenshot(named: "Game form, portrait")
+        save.tap()
+
+        let uno = app.buttons["game.Uno"]
+        scrollListToReveal(uno)
+        let gameRows = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH 'game.'"))
+        XCTAssertEqual(gameRows.allElementsBoundByIndex.last?.identifier, "game.Uno", "Custom Games are listed below the built-ins")
+        attachScreenshot(named: "Game picker with a custom Game, portrait")
+
+        uno.tap()
+        XCTAssertTrue(app.navigationBars["Uno"].waitForExistence(timeout: 5))
+        pickPlayers(["Ada", "Grace"])
+        tapStart()
+
+        let quickScores = (0..<2).map { app.buttons["quickScore.\($0)"] }
+        XCTAssertEqual(quickScores.map(\.label), ["20", "50"], "The Quick scores the Game was given")
+        quickScores[1].tap()
+        press("next")
+        quickScores[0].tap()
+        XCTAssertEqual(total(0), "50")
+        XCTAssertEqual(total(1), "20")
+
+        backToList()
+        app.terminate()
+        app.launch()
+
+        openGamePicker()
+        scrollListToReveal(app.buttons["game.Uno"])
+    }
+
+    func testABuiltInIsCopiedToEditAndItsCopyIsEditedThenDeletedLeavingItsMatch() throws {
+        launch(in: .landscapeLeft)
+        openGamePicker()
+
+        let skyjo = app.buttons["game.Skyjo"]
+        scrollListToReveal(skyjo)
+        skyjo.press(forDuration: 1.2)
+        let duplicate = app.buttons["Duplicate & Edit"]
+        XCTAssertTrue(duplicate.waitForExistence(timeout: 5), "Long-pressing a built-in offers a copy")
+        XCTAssertFalse(app.buttons["Edit"].exists, "A built-in itself is read-only")
+        duplicate.tap()
+
+        let name = app.textFields["gameName"]
+        XCTAssertTrue(name.waitForExistence(timeout: 5))
+        XCTAssertEqual(name.value as? String, "Skyjo copy")
+        attachScreenshot(named: "Game form, landscape")
+        let target = dragFormToReveal(app.textFields["targetTotalField"])
+        XCTAssertEqual(target.value as? String, "100")
+        replaceText(in: target, with: "50")
+        app.buttons["saveGameButton"].tap()
+
+        XCTAssertTrue(skyjo.waitForExistence(timeout: 5), "The built-in stays as it was")
+        // A landscape phone builds only the rows on screen: the copy, listed
+        // last, exists once scrolled to.
+        let copy = app.buttons["game.Skyjo copy"]
+        scrollListToReveal(copy)
+        attachScreenshot(named: "Game picker with a custom Game, landscape")
+        copy.tap()
+        pickPlayers(["Ada", "Grace"])
+        tapStart()
+        press("6", "0", "next", "5", "next")
+        XCTAssertTrue(element("endConditionNotice").waitForExistence(timeout: 5), "The copy ends at its own target")
+        backToList()
+
+        openGamePicker()
+        scrollListToReveal(copy)
+        copy.swipeLeft()
+        app.buttons["Edit"].tap()
+        XCTAssertTrue(app.navigationBars["Edit Game"].waitForExistence(timeout: 5))
+        replaceText(in: name, with: "Skyjo to 50")
+        app.buttons["saveGameButton"].tap()
+
+        let renamed = app.buttons["game.Skyjo to 50"]
+        scrollListToReveal(renamed)
+        XCTAssertFalse(copy.exists, "An edit keeps the Game in its place, under its new name")
+        renamed.swipeLeft()
+        app.buttons["Delete"].tap()
+        XCTAssertTrue(renamed.waitForNonExistence(timeout: 5))
+
+        app.buttons["cancelNewMatchButton"].tap()
+        let row = app.buttons["matchRow"]
+        XCTAssertTrue(row.waitForExistence(timeout: 5))
+        XCTAssertTrue(row.label.contains("Skyjo copy"), "The Match keeps the Game it was played under")
+        row.tap()
+        XCTAssertTrue(app.navigationBars["Skyjo copy"].waitForExistence(timeout: 5))
+        XCTAssertEqual(total(0), "60")
+        XCTAssertTrue(element("endConditionNotice").exists, "Its target is still 50")
+    }
+
     // MARK: Helpers
+
+    /// Opens the Game picker from New Match.
+    private func openGamePicker() {
+        let newMatch = app.buttons["newMatchButton"]
+        XCTAssertTrue(newMatch.waitForExistence(timeout: 10))
+        newMatch.tap()
+        XCTAssertTrue(app.buttons["game.Tarot"].waitForExistence(timeout: 5))
+    }
+
+    /// Scrolls the Game picker until the element can be tapped: a phone
+    /// builds only the rows on screen, and a landscape one shows few.
+    private func scrollListToReveal(_ element: XCUIElement) {
+        for _ in 0..<4 where !(element.exists && element.isHittable) {
+            app.collectionViews.firstMatch.swipeUp()
+        }
+        XCTAssertTrue(element.isHittable, "\(element.identifier) never came into reach")
+    }
+
+    /// Scrolls the custom Game form until the element can be tapped, by a held
+    /// drag down its trailing margin: a swipe through the middle lands on the
+    /// grid of symbols or a control and leaves the form where it is.
+    @discardableResult
+    private func dragFormToReveal(_ element: XCUIElement) -> XCUIElement {
+        for _ in 0..<8 where !(element.exists && element.isHittable) {
+            app.coordinate(withNormalizedOffset: CGVector(dx: 0.97, dy: 0.75))
+                .press(forDuration: 0.1, thenDragTo: app.coordinate(withNormalizedOffset: CGVector(dx: 0.97, dy: 0.3)))
+        }
+        XCTAssertTrue(element.exists && element.isHittable, "\(element.identifier) never came into reach")
+        return element
+    }
+
+    private func tapInList(_ element: XCUIElement) {
+        scrollListToReveal(element)
+        element.tap()
+    }
+
+    /// Types over whatever the field holds, from a tap at its trailing edge so
+    /// the cursor lands after the text.
+    private func replaceText(in field: XCUIElement, with text: String) {
+        field.coordinate(withNormalizedOffset: CGVector(dx: 0.98, dy: 0.5)).tap()
+        let length = (field.value as? String)?.count ?? 0
+        field.typeText(String(repeating: XCUIKeyboardKey.delete.rawValue, count: length) + text)
+    }
 
     /// With no Matches, every built-in Game is a card, New Match sits at the
     /// bottom, and a card opens setup straight on its Game's Players.
