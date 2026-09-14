@@ -1,24 +1,32 @@
 import SwiftUI
 import FinalScoreCore
 
-/// The strip across the top of a Match: once ended, the Winner; before that,
-/// the End condition's announcement once it is reached. Never in the way of
-/// scoring, and nothing at all the rest of the time.
+/// The strip across the top of a Match: once ended, the Winner and a Rematch;
+/// before that, the End condition's announcement once it is reached. Never in
+/// the way of scoring, and nothing at all the rest of the time.
 struct MatchBanner: View {
     let match: Match
     /// Asks to end the Match, from the announcement's End Match button.
     let onEnd: () -> Void
+    /// Asks to set up a Rematch, once the Match is ended.
+    let onRematch: () -> Void
     @Environment(\.verticalSizeClass) private var verticalSizeClass
 
     var body: some View {
         if match.isEnded {
-            Label(match.outcomeText ?? "Match ended", systemImage: "trophy.fill")
-                .font(.headline)
-                .foregroundStyle(.tint)
-                .frame(maxWidth: .infinity)
-                .accessibilityElement(children: .combine)
-                .accessibilityIdentifier("outcome")
-                .modifier(BannerStyle(isCompact: verticalSizeClass == .compact))
+            HStack(spacing: 12) {
+                Label(match.outcomeText ?? "Match ended", systemImage: "trophy.fill")
+                    .font(.headline)
+                    .foregroundStyle(.tint)
+                    .accessibilityElement(children: .combine)
+                    .accessibilityIdentifier("outcome")
+                Spacer(minLength: 8)
+                Button("Rematch", systemImage: "arrow.counterclockwise", action: onRematch)
+                    .buttonStyle(.borderedProminent)
+                    .controlSize(.small)
+                    .accessibilityIdentifier("rematchButton")
+            }
+            .modifier(BannerStyle(isCompact: verticalSizeClass == .compact))
         } else if match.endConditionIsReached, let reason = match.endConditionText {
             HStack(spacing: 12) {
                 Image(systemName: "flag.checkered")

@@ -105,5 +105,7 @@ _Avoid_: champion, leader (the leader is whoever is winning mid-Match)
 
 **Rematch**:
 A new Match created from a finished one's configuration — same Game, same Teams,
-empty scorepad. Distinct from resuming, which returns to a Match still in play.
+same Seating order and rotation, empty scorepad. It opens in setup with all of
+that picked, so any of it can change before Start. Distinct from resuming, which
+returns to a Match still in play.
 _Avoid_: replay, repeat, new round, restart

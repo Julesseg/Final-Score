@@ -7,13 +7,16 @@ import FinalScoreCore
 /// Core.
 struct TallyView: View {
     @Binding var match: Match
+    /// Sets up a Rematch of the Match, once it is ended.
+    let onRematch: () -> Void
     @State private var pad: TallyPad
     @State private var isConfirmingEnd = false
     @State private var isShowingHistory = false
     @Environment(\.verticalSizeClass) private var verticalSizeClass
 
-    init(match: Binding<Match>) {
+    init(match: Binding<Match>, onRematch: @escaping () -> Void) {
         _match = match
+        self.onRematch = onRematch
         _pad = State(initialValue: TallyPad(match: match.wrappedValue))
     }
 
@@ -22,7 +25,7 @@ struct TallyView: View {
             if isCompact {
                 HStack(spacing: 0) {
                     VStack(spacing: 0) {
-                        MatchBanner(match: pad.match) { isConfirmingEnd = true }
+                        MatchBanner(match: pad.match, onEnd: { isConfirmingEnd = true }, onRematch: onRematch)
                         board
                     }
                     if pad.selection != nil {
@@ -33,7 +36,7 @@ struct TallyView: View {
                 }
             } else {
                 VStack(spacing: 0) {
-                    MatchBanner(match: pad.match) { isConfirmingEnd = true }
+                    MatchBanner(match: pad.match, onEnd: { isConfirmingEnd = true }, onRematch: onRematch)
                     board
                     if pad.selection != nil {
                         Divider()

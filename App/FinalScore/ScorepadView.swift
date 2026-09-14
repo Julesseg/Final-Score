@@ -10,12 +10,15 @@ import FinalScoreCore
 /// which Team scored.
 struct ScorepadView: View {
     @Binding var match: Match
+    /// Sets up a Rematch of the Match, once it is ended.
+    let onRematch: () -> Void
     @State private var scorepad: Scorepad
     @State private var isConfirmingEnd = false
     @Environment(\.verticalSizeClass) private var verticalSizeClass
 
-    init(match: Binding<Match>) {
+    init(match: Binding<Match>, onRematch: @escaping () -> Void) {
         _match = match
+        self.onRematch = onRematch
         _scorepad = State(initialValue: Scorepad(match: match.wrappedValue))
     }
 
@@ -24,7 +27,7 @@ struct ScorepadView: View {
             if verticalSizeClass == .compact {
                 HStack(spacing: 0) {
                     VStack(spacing: 0) {
-                        MatchBanner(match: scorepad.match) { isConfirmingEnd = true }
+                        MatchBanner(match: scorepad.match, onEnd: { isConfirmingEnd = true }, onRematch: onRematch)
                         grid
                     }
                     if showsEntry {
@@ -35,7 +38,7 @@ struct ScorepadView: View {
                 }
             } else {
                 VStack(spacing: 0) {
-                    MatchBanner(match: scorepad.match) { isConfirmingEnd = true }
+                    MatchBanner(match: scorepad.match, onEnd: { isConfirmingEnd = true }, onRematch: onRematch)
                     grid
                     if showsEntry {
                         Divider()
