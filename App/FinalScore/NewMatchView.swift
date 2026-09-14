@@ -186,6 +186,7 @@ private struct PlayersView: View {
             }
         }
         .navigationTitle(setup.game.name)
+        .tint(setup.game.accent.color)
         .toolbar {
             ToolbarItem(placement: .confirmationAction) {
                 Button("Start") {
