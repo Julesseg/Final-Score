@@ -653,6 +653,9 @@ final class FinalScoreUITests: XCTestCase {
         tap("score.2.0")
         press("1", "3", "0")
         XCTAssertEqual(total(0), "130")
+        // On a small phone the keypad and its contracts squeeze Round 2 out of
+        // the grid: put it away to read the other Team's Score.
+        hideKeypad()
         XCTAssertEqual(app.buttons["score.2.1"].value as? String, "0")
         XCTAssertTrue(app.images["leader.0"].exists)
 
