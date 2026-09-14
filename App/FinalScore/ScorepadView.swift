@@ -7,7 +7,8 @@ import FinalScoreCore
 /// `Scorepad`'s business, in Core. In a Game that tracks the Dealer, a badge
 /// marks who deals each Round, and tapping it hands the deal to someone else.
 /// In a Game where one Team scores per Round, the keypad's place first asks
-/// which Team scored.
+/// which Team scored. Each Team's column wears its own colour, so its Total
+/// reads from across the table.
 struct ScorepadView: View {
     @Binding var match: Match
     /// Sets up a Rematch of the Match, once it is ended.
@@ -48,11 +49,11 @@ struct ScorepadView: View {
             }
         }
         .tint(game.accent.color)
-        .animation(.default, value: scorepad.match.endConditionIsReached)
-        .animation(.default, value: scorepad.match.isEnded)
+        .celebrating(scorepad.match)
         .navigationTitle(game.name)
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
+            GameTitle(game: game)
             if !scorepad.match.isEnded {
                 ToolbarItem(placement: .primaryAction) {
                     Button("End Match", systemImage: "flag.checkered") { isConfirmingEnd = true }
@@ -216,6 +217,7 @@ struct ScorepadView: View {
             ForEach(Array(teams.enumerated()), id: \.element.id) { index, team in
                 Text(team.name)
                     .font(.headline)
+                    .foregroundStyle(scorepad.match.style(of: team.id))
                     .lineLimit(1)
                     .minimumScaleFactor(0.7)
                     .padding(.horizontal, 4)
@@ -274,6 +276,11 @@ struct ScorepadView: View {
                 }
             }
             .font(.title3.monospacedDigit())
+            // Never truncated: a rolling number caught by the columns widening,
+            // as the keypad goes away, could otherwise stick as "…".
+            .fixedSize(horizontal: true, vertical: false)
+            // On the cell rather than its number, so a first Score bumps too.
+            .scoreBump(on: points)
             .frame(maxWidth: .infinity, minHeight: 44)
             .background {
                 if isSelected {
@@ -326,9 +333,11 @@ struct ScorepadView: View {
     private func totals(columnWidth: CGFloat) -> some View {
         let match = scorepad.match
         let leaders = Set(match.leaders.map(\.id))
-        // Partial Totals make a partial leader: both are muted until the Round is in.
-        let style: HierarchicalShapeStyle = match.totalsArePartial ? .secondary : .primary
-        return VStack(spacing: 4) {
+        // Partial Totals make a partial leader: both are muted until the Round
+        // is in, though never so far that a Total stops reading across the table.
+        let isPartial = match.totalsArePartial
+        let isCompact = verticalSizeClass == .compact
+        return VStack(spacing: isCompact ? 0 : 4) {
             HStack(spacing: 0) {
                 Text("Σ")
                     .font(.headline)
@@ -337,16 +346,23 @@ struct ScorepadView: View {
                     .accessibilityLabel("Totals")
                 ForEach(Array(teams.enumerated()), id: \.element.id) { index, team in
                     VStack(spacing: 0) {
-                        Image(systemName: match.totalsArePartial ? "crown" : "crown.fill")
+                        Image(systemName: isPartial ? "crown" : "crown.fill")
                             .font(.caption)
-                            .foregroundStyle(match.totalsArePartial ? AnyShapeStyle(.secondary) : AnyShapeStyle(.tint))
+                            .foregroundStyle(isPartial ? AnyShapeStyle(.secondary) : AnyShapeStyle(match.style(of: team.id)))
                             .opacity(leaders.contains(team.id) ? 1 : 0)
                             .accessibilityHidden(!leaders.contains(team.id))
                             .accessibilityLabel("Leading")
                             .accessibilityIdentifier("leader.\(index)")
-                        Text("\(match.total(for: team.id))")
-                            .font(.title2.bold().monospacedDigit())
-                            .foregroundStyle(style)
+                        let total = match.total(for: team.id)
+                        // Large enough to read from across the table, and
+                        // shrunk only when a long Total meets a narrow column.
+                        Text("\(total)")
+                            .font(.system(size: isCompact ? 34 : 44, weight: .heavy, design: .rounded).monospacedDigit())
+                            .foregroundStyle(match.style(of: team.id).opacity(isPartial ? 0.7 : 1))
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.4)
+                            .padding(.horizontal, 4)
+                            .scoreBump(on: total)
                             .accessibilityIdentifier("total.\(index)")
                     }
                     .frame(width: columnWidth)
@@ -360,7 +376,7 @@ struct ScorepadView: View {
                     .accessibilityIdentifier("partialTotalsNotice")
             }
         }
-        .padding(.vertical, 10)
+        .padding(.vertical, isCompact ? 4 : 10)
         .frame(maxWidth: .infinity, alignment: .leading)
     }
 }

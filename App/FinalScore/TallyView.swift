@@ -4,7 +4,7 @@ import FinalScoreCore
 /// A Tally Match: one large Total per Team with − / + for thumbs, the keypad
 /// for larger changes, and every Score recorded behind a History disclosure.
 /// No Rounds and no Dealer. What each tap records is `TallyPad`'s business, in
-/// Core.
+/// Core. Each Team's Total wears its own colour, as on the scorepad.
 struct TallyView: View {
     @Binding var match: Match
     /// Sets up a Rematch of the Match, once it is ended.
@@ -46,11 +46,11 @@ struct TallyView: View {
             }
         }
         .tint(pad.match.game.accent.color)
-        .animation(.default, value: pad.match.endConditionIsReached)
-        .animation(.default, value: pad.match.isEnded)
+        .celebrating(pad.match)
         .navigationTitle(pad.match.game.name)
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
+            GameTitle(game: pad.match.game)
             if !pad.match.isEnded {
                 ToolbarItem(placement: .primaryAction) {
                     Button("End Match", systemImage: "flag.checkered") { isConfirmingEnd = true }
@@ -109,13 +109,14 @@ struct TallyView: View {
             HStack(spacing: 6) {
                 Image(systemName: "crown.fill")
                     .font(.caption)
-                    .foregroundStyle(.tint)
+                    .foregroundStyle(pad.match.style(of: team.id))
                     .opacity(isLeader ? 1 : 0)
                     .accessibilityHidden(!isLeader)
                     .accessibilityLabel("Leading")
                     .accessibilityIdentifier("leader.\(index)")
                 Text(team.name)
                     .font(.headline)
+                    .foregroundStyle(pad.match.style(of: team.id))
                     .lineLimit(1)
                     .accessibilityIdentifier("teamName.\(index)")
                 Spacer(minLength: 4)
@@ -133,11 +134,11 @@ struct TallyView: View {
                     adjustButton(for: team, index: index, by: -1)
                 }
                 Text("\(total)")
-                    .font(.system(size: isCompact ? 44 : 60, weight: .bold, design: .rounded).monospacedDigit())
+                    .font(.system(size: isCompact ? 44 : 60, weight: .heavy, design: .rounded).monospacedDigit())
+                    .foregroundStyle(pad.match.style(of: team.id))
                     .lineLimit(1)
                     .minimumScaleFactor(0.5)
-                    .contentTransition(.numericText(value: Double(total)))
-                    .animation(.snappy, value: total)
+                    .scoreBump(on: total)
                     .frame(maxWidth: .infinity)
                     .accessibilityIdentifier("total.\(index)")
                 if !pad.match.isEnded {

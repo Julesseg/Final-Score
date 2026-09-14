@@ -35,6 +35,11 @@ extension Game {
 }
 
 extension Match {
+    /// What a Team's name, Total and crown wear.
+    func style(of team: Team.ID) -> TeamStyle {
+        TeamStyle(color: accent(of: team).color)
+    }
+
     /// "Grace wins", "Ada and Linus tie", or nil while in play or without a Score.
     var outcomeText: String? {
         outcome.map { $0.text(wins: "wins", tie: "tie") }
@@ -82,6 +87,16 @@ private extension Match.Outcome {
     }
 }
 
+/// A Team's colour, deepened on a light background so that even a green or
+/// orange Total reads from across the table. Dark mode takes it as it is.
+struct TeamStyle: ShapeStyle {
+    let color: Color
+
+    func resolve(in environment: EnvironmentValues) -> Color {
+        environment.colorScheme == .light ? color.mix(with: .black, by: 0.2) : color
+    }
+}
+
 /// A Game's symbol on its accent colour.
 struct GameSymbol: View {
     let game: Game
@@ -93,5 +108,24 @@ struct GameSymbol: View {
             .frame(width: 40, height: 40)
             .background(game.accent.color.gradient, in: RoundedRectangle(cornerRadius: 10))
             .accessibilityHidden(true)
+    }
+}
+
+/// The Game's symbol and name, in place of a plain title over a Match.
+struct GameTitle: ToolbarContent {
+    let game: Game
+
+    var body: some ToolbarContent {
+        ToolbarItem(placement: .principal) {
+            Label {
+                Text(game.name).font(.headline)
+            } icon: {
+                Image(systemName: game.symbol)
+                    .foregroundStyle(game.accent.color)
+            }
+            .labelStyle(.titleAndIcon)
+            .accessibilityElement(children: .combine)
+            .accessibilityAddTraits(.isHeader)
+        }
     }
 }
