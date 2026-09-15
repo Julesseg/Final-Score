@@ -1,10 +1,10 @@
 import SwiftUI
 import FinalScoreCore
 
-/// A Tally Match: one large Total per Team with − / + for thumbs, the keypad
-/// for larger changes, and every Score recorded behind a History disclosure.
-/// No Rounds and no Dealer. What each tap records is `TallyPad`'s business, in
-/// Core. Each Team's Total wears its own colour, as on the scorepad.
+/// A Tally Match: one large Total per Team with − / + for thumbs, the Total
+/// itself opening the keypad for larger changes, and every Score recorded
+/// behind a History disclosure. No Rounds and no Dealer. What each tap records
+/// is `TallyPad`'s business, in Core. Each Team's card wears its own colour.
 struct TallyView: View {
     @Binding var match: Match
     /// Sets up a Rematch of the Match, once it is ended.
@@ -120,27 +120,12 @@ struct TallyView: View {
                     .lineLimit(1)
                     .accessibilityIdentifier("teamName.\(index)")
                 Spacer(minLength: 4)
-                if !pad.match.isEnded {
-                    Button("Enter Score", systemImage: "number") { pad.select(.newScore(team: team.id)) }
-                        .labelStyle(.iconOnly)
-                        .font(.title3)
-                        .frame(minWidth: 44, minHeight: 44)
-                        .accessibilityLabel("Enter a Score for \(team.name)")
-                        .accessibilityIdentifier("keypad.\(index)")
-                }
             }
             HStack(spacing: 8) {
                 if !pad.match.isEnded {
                     adjustButton(for: team, index: index, by: -1)
                 }
-                Text("\(total)")
-                    .font(.system(size: isCompact ? 44 : 60, weight: .heavy, design: .rounded).monospacedDigit())
-                    .foregroundStyle(pad.match.style(of: team.id))
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.5)
-                    .scoreBump(on: total)
-                    .frame(maxWidth: .infinity)
-                    .accessibilityIdentifier("total.\(index)")
+                totalView(for: team, index: index, total: total)
                 if !pad.match.isEnded {
                     adjustButton(for: team, index: index, by: 1)
                 }
@@ -152,6 +137,35 @@ struct TallyView: View {
             if isSelected {
                 RoundedRectangle(cornerRadius: 16).strokeBorder(.tint, lineWidth: 2)
             }
+        }
+        // − / + and the selected outline wear the Team's colour, like its Total.
+        .tint(pad.match.style(of: team.id))
+    }
+
+    /// Tapping the Total opens the keypad on a new Score for its Team, while
+    /// the Match is in play. Once ended it is only a number.
+    @ViewBuilder
+    private func totalView(for team: Team, index: Int, total: Int) -> some View {
+        let number = Text("\(total)")
+            .font(.system(size: isCompact ? 44 : 60, weight: .heavy, design: .rounded).monospacedDigit())
+            .foregroundStyle(pad.match.style(of: team.id))
+            .lineLimit(1)
+            .minimumScaleFactor(0.5)
+            .scoreBump(on: total)
+            .frame(maxWidth: .infinity)
+        if pad.match.isEnded {
+            number
+                .accessibilityIdentifier("total.\(index)")
+        } else {
+            Button {
+                pad.select(.newScore(team: team.id))
+            } label: {
+                number.contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel("Enter a Score for \(team.name)")
+            .accessibilityValue("\(total)")
+            .accessibilityIdentifier("total.\(index)")
         }
     }
 
@@ -245,8 +259,14 @@ struct TallyView: View {
     private var keypad: some View {
         KeypadView(
             target: $pad,
-            title: pad.selectedTeam.flatMap { id in teams.first { $0.id == id } }?.name ?? "",
+            title: keypadTitle,
             nextTitle: "Done"
         ) { pad.deselect() }
+    }
+
+    /// "Add to Grace" on a new Score, and the Team alone on one being corrected.
+    private var keypadTitle: String {
+        let name = pad.selectedTeam.flatMap { id in teams.first { $0.id == id } }?.name ?? ""
+        return pad.isAddingScore ? "Add to \(name)" : name
     }
 }

@@ -54,6 +54,7 @@ struct KeypadView<Target: KeypadTarget>: View {
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
                     .lineLimit(1)
+                    .accessibilityIdentifier("keypadTitle")
                 Spacer()
                 Text(target.keypadText)
                     .font(.title2.bold().monospacedDigit())
