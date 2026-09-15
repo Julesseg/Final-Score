@@ -8,7 +8,7 @@ import SwiftUI
 import FinalScoreCore
 
 enum NewRoundVariant: String, CaseIterable {
-    case a = "A", b = "B", c = "C", d = "D"
+    case a = "A", b = "B", c = "C", d = "D", e = "E"
 
     var name: String {
         switch self {
@@ -16,6 +16,7 @@ enum NewRoundVariant: String, CaseIterable {
         case .b: "Labelled cell"
         case .c: "Ghost Round"
         case .d: "Tinted, with Dealer"
+        case .e: "Lone +, ghost cell"
         }
     }
 }
@@ -50,6 +51,7 @@ struct NewRoundRowPrototypeLabel: View {
         case .b: labelledCell
         case .c: ghostRound
         case .d: tintedWithDealer
+        case .e: loneGhostCell
         }
     }
 
@@ -61,6 +63,23 @@ struct NewRoundRowPrototypeLabel: View {
             .frame(width: max(info.visibleWidth - 6, 0), height: 44)
             .frame(maxWidth: .infinity, alignment: .leading)
             .background(RoundedRectangle(cornerRadius: 8).fill(.fill.tertiary))
+            .contentShape(RoundedRectangle(cornerRadius: 8))
+            .padding(.horizontal, 3)
+    }
+
+    /// E: A's single full-width cell with its lone +, drawn in C's faint,
+    /// dashed outline.
+    private var loneGhostCell: some View {
+        Image(systemName: "plus")
+            .font(.title3.weight(.semibold))
+            .foregroundStyle(.tint)
+            .frame(width: max(info.visibleWidth - 6, 0), height: 44)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background {
+                RoundedRectangle(cornerRadius: 8).fill(.tint.opacity(0.05))
+                RoundedRectangle(cornerRadius: 8)
+                    .strokeBorder(.tint.opacity(0.45), style: StrokeStyle(lineWidth: 1.5, dash: [5, 4]))
+            }
             .contentShape(RoundedRectangle(cornerRadius: 8))
             .padding(.horizontal, 3)
     }

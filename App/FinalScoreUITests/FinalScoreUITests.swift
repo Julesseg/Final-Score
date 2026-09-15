@@ -115,15 +115,14 @@ final class FinalScoreUITests: XCTestCase {
                 XCUIDevice.shared.orientation = .landscapeLeft
                 sleep(3)
             }
-            for variant in ["A", "B", "C", "D"] {
-                for _ in 0..<4 where !app.staticTexts["prototype.variant"].label.hasPrefix(variant) {
+            for variant in ["E"] {
+                for _ in 0..<12 where !app.staticTexts["prototype.variant"].label.hasPrefix(variant) {
                     tap("prototype.next")
                     sleep(1)
                 }
                 XCTAssertTrue(app.staticTexts["prototype.variant"].label.hasPrefix(variant))
                 print("SHOT-STATE \(orientation)-\(variant)")
                 sleep(6)
-                tap("prototype.next")
             }
         }
         print("SHOT-STATE done")
