@@ -1041,6 +1041,7 @@ final class FinalScoreUITests: XCTestCase {
         press("1", "2")
         XCTAssertEqual(total(1), "11", "The keypad lands its Score as typed")
         XCTAssertEqual(app.staticTexts["keypadTitle"].label, "Add to Grace", "Still adding once the first key records the Score")
+        attachScreenshot(named: "Tally adding a Score, \(orientationName)")
         press("next")
         XCTAssertFalse(app.buttons["key.next"].exists, "Done puts the keypad away")
 
@@ -1056,6 +1057,7 @@ final class FinalScoreUITests: XCTestCase {
 
         history.tap()
         XCTAssertEqual(app.staticTexts["keypadTitle"].label, "Grace", "A recorded Score is titled with its Team alone")
+        attachScreenshot(named: "Tally correcting a Score, \(orientationName)")
         hideKeypad()
     }
 
