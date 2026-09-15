@@ -3,11 +3,12 @@ import FinalScoreCore
 
 /// The paper scorepad: one column per Team, one row per Round, Totals along
 /// the bottom. Tapping a Score opens the keypad on it, however old the Round;
-/// swiping a Round, or its menu, deletes it. What each gesture and key does is
-/// `Scorepad`'s business, in Core. In a Game that tracks the Dealer, a badge
-/// marks who deals each Round, and tapping it hands the deal to someone else.
-/// Each Team's column wears its own colour, so its Total reads from across the
-/// table.
+/// swiping a Round, or its menu, deletes it; the + row under the last Round
+/// starts the next one while the Match is in play. What each gesture and key
+/// does is `Scorepad`'s business, in Core. In a Game that tracks the Dealer, a
+/// badge marks who deals each Round, and tapping it hands the deal to someone
+/// else. Each Team's column wears its own colour, so its Total reads from
+/// across the table.
 struct ScorepadView: View {
     @Binding var match: Match
     /// Sets up a Rematch of the Match, once it is ended.
@@ -57,11 +58,6 @@ struct ScorepadView: View {
                 ToolbarItem(placement: .primaryAction) {
                     Button("End Match", systemImage: "flag.checkered") { isConfirmingEnd = true }
                         .accessibilityIdentifier("endMatchButton")
-                }
-                ToolbarItem(placement: .primaryAction) {
-                    Button("New Round", systemImage: "plus") { scorepad.startNewRound() }
-                        .disabled(!scorepad.match.canStartNewRound)
-                        .accessibilityIdentifier("newRoundButton")
                 }
             }
         }
@@ -134,11 +130,16 @@ struct ScorepadView: View {
                                 row(round, number: index + 1, columnWidth: columnWidth)
                                     .id(round.id)
                             }
+                            if !scorepad.match.isEnded {
+                                newRoundRow(visibleWidth: proxy.size.width)
+                                    .id(Self.newRoundRowID)
+                            }
                         }
                         .listStyle(.plain)
+                        // Down to the + row, so the new Round shows with the way to the next one.
                         .onChange(of: scorepad.match.rounds.count) { previous, count in
-                            guard count > previous, let last = scorepad.match.rounds.last else { return }
-                            withAnimation { scroller.scrollTo(last.id, anchor: .bottom) }
+                            guard count > previous, !scorepad.match.isEnded else { return }
+                            withAnimation { scroller.scrollTo(Self.newRoundRowID, anchor: .bottom) }
                         }
                     }
                     Divider()
@@ -192,6 +193,30 @@ struct ScorepadView: View {
         .contextMenu {
             deleteButton(for: round)
         }
+    }
+
+    private static let newRoundRowID = "newRoundRow"
+
+    /// Where the next Round's row will go: a + across the whole width that
+    /// starts it, giving 0 to every Team still unscored in the Round before.
+    /// The + centres on the screen, not on a grid of Teams wider than it.
+    private func newRoundRow(visibleWidth: CGFloat) -> some View {
+        Button {
+            scorepad.startNewRound()
+        } label: {
+            Image(systemName: "plus")
+                .font(.title3.weight(.semibold))
+                .foregroundStyle(.tint)
+                .frame(width: visibleWidth, height: 44)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .padding(.vertical, 2)
+        .listRowInsets(EdgeInsets())
+        .listRowSeparator(.hidden)
+        .accessibilityLabel("New Round")
+        .accessibilityIdentifier("newRoundButton")
     }
 
     private func deleteButton(for round: Round) -> some View {
