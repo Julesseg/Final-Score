@@ -59,6 +59,20 @@ public final class MatchStore {
         try data.write(to: url(for: match.id), options: .atomic)
     }
 
+    /// Removes the Match and its snapshot, so it doesn't come back on the next
+    /// launch. A Match the store doesn't have changes nothing.
+    ///
+    /// The Match leaves `matches` even when this throws: the throw only says
+    /// the snapshot couldn't be removed from disk.
+    public func delete(_ id: Match.ID) throws {
+        guard byID.removeValue(forKey: id) != nil else { return }
+        matches = Self.listOrder(byID.values)
+        let file = url(for: id)
+        // A snapshot never written has nothing to bring the Match back.
+        guard FileManager.default.fileExists(atPath: file.path) else { return }
+        try FileManager.default.removeItem(at: file)
+    }
+
     private func url(for id: Match.ID) -> URL {
         directory.appendingPathComponent("\(id.uuidString).json")
     }

@@ -31,11 +31,26 @@ final class MatchLibrary {
     /// for the rest of the session and the very next Score writes the whole
     /// snapshot again, so there is nothing to interrupt scoring for.
     func save(_ match: Match) {
+        attempt("save Match \(match.id)") { try store.save(match) }
+    }
+
+    /// Removes the Match from the library and its snapshot from disk.
+    ///
+    /// A snapshot that can't be removed is logged rather than raised: the Match
+    /// is still gone for the rest of the session, though the next launch may
+    /// bring it back.
+    func delete(_ id: Match.ID) {
+        attempt("delete Match \(id)") { try store.delete(id) }
+    }
+
+    /// Makes the change, logging a failure rather than raising it, then takes
+    /// the store's Matches as they now stand.
+    private func attempt(_ change: String, _ body: () throws -> Void) {
         do {
-            try store.save(match)
+            try body()
         } catch {
             Logger.persistence.error(
-                "Could not save Match \(match.id, privacy: .public): \(error.localizedDescription, privacy: .public)"
+                "Could not \(change, privacy: .public): \(error.localizedDescription, privacy: .public)"
             )
         }
         matches = store.matches

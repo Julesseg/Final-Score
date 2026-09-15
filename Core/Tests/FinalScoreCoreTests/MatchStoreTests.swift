@@ -177,6 +177,57 @@ final class MatchStoreTests {
         #expect(MatchStore(directory: directory).matches == [match])
     }
 
+    @Test func aDeletedMatchIsGoneForGood() throws {
+        let store = MatchStore(directory: directory)
+        let kept = skyjoMatch(startedAt: Date(timeIntervalSince1970: 1_000))
+        var deleted = skyjoMatch(startedAt: Date(timeIntervalSince1970: 2_000))
+        deleted.end(at: Date(timeIntervalSince1970: 3_000))
+        try store.save(kept)
+        try store.save(deleted)
+
+        try store.delete(deleted.id)
+
+        #expect(store.matches == [kept])
+        #expect(store.match(id: deleted.id) == nil)
+        #expect(store.newestStartedFirst == [kept], "Its Players are no longer the last ones picked")
+        #expect(MatchStore(directory: directory).matches == [kept])
+    }
+
+    @Test func deletingAMatchInProgressRemovesItsSnapshotFile() throws {
+        let store = MatchStore(directory: directory)
+        var match = skyjoMatch()
+        match.setScore(4, for: match.teams[0].id, inRound: match.rounds[0].id)
+        try store.save(match)
+
+        try store.delete(match.id)
+
+        let files = try FileManager.default.contentsOfDirectory(atPath: directory.path)
+        #expect(files.isEmpty)
+    }
+
+    @Test func deletingAMatchWhoseSnapshotNeverReachedTheDiskStillRemovesIt() throws {
+        // A file where the directory should be: the Match was never written.
+        try Data().write(to: directory)
+        let store = MatchStore(directory: directory)
+        let match = skyjoMatch()
+        #expect(throws: (any Error).self) { try store.save(match) }
+
+        try store.delete(match.id)
+
+        #expect(store.matches.isEmpty)
+    }
+
+    @Test func deletingAMatchTheStoreDoesNotHaveChangesNothing() throws {
+        let store = MatchStore(directory: directory)
+        let match = skyjoMatch()
+        try store.save(match)
+
+        try store.delete(UUID())
+
+        #expect(store.matches == [match])
+        #expect(MatchStore(directory: directory).matches == [match])
+    }
+
     @Test func aMatchIsFoundByItsID() throws {
         let store = MatchStore(directory: directory)
         let match = skyjoMatch()

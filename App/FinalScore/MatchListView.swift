@@ -9,6 +9,8 @@ struct MatchListView: View {
     let games: GameLibrary
     @State private var path: [Match.ID] = []
     @State private var newMatch: NewMatchRequest?
+    /// The Match whose delete is waiting on the confirmation dialog.
+    @State private var deleting: Match.ID?
 
     var body: some View {
         NavigationStack(path: $path) {
@@ -25,17 +27,18 @@ struct MatchListView: View {
                 Button {
                     newMatch = NewMatchRequest(game: nil)
                 } label: {
-                    Label("New Match", systemImage: "plus")
-                        .font(.headline)
-                        .frame(maxWidth: .infinity)
+                    Image(systemName: "plus")
+                        .font(.title2.weight(.semibold))
+                        .foregroundStyle(.primary)
+                        .frame(width: 60, height: 60)
+                        .contentShape(.circle)
                 }
-                .buttonStyle(.borderedProminent)
-                .buttonBorderShape(.capsule)
-                .controlSize(.extraLarge)
-                .frame(maxWidth: 480)
-                .padding(.horizontal)
-                .padding(.bottom, 8)
+                .buttonStyle(.plain)
+                // Clear rather than tinted, so the list shows through it.
+                .glassEffect(.clear.interactive(), in: .circle)
+                .accessibilityLabel("New Match")
                 .accessibilityIdentifier("newMatchButton")
+                .padding(.bottom, 8)
             }
             .navigationDestination(for: Match.ID.self) { id in
                 if let match = library.match(id: id) {
@@ -88,6 +91,10 @@ struct MatchListView: View {
         }
     }
 
+    private func isDeleting(_ match: Match) -> Binding<Bool> {
+        Binding(get: { deleting == match.id }, set: { if !$0 { deleting = nil } })
+    }
+
     @ViewBuilder
     private func section(_ title: String, _ matches: [Match]) -> some View {
         if !matches.isEmpty {
@@ -97,6 +104,33 @@ struct MatchListView: View {
                         MatchRow(match: match)
                     }
                     .accessibilityIdentifier("matchRow")
+                    // Either way only asks, so a full swipe is safe: the
+                    // dialog does the deleting.
+                    .swipeActions(allowsFullSwipe: true) {
+                        // Tinted rather than destructive: a destructive swipe
+                        // takes the row away before the dialog is answered.
+                        Button("Delete", systemImage: "trash") { deleting = match.id }
+                            .tint(.red)
+                    }
+                    .contextMenu {
+                        Button("Delete", systemImage: "trash", role: .destructive) { deleting = match.id }
+                    }
+                    // On the row, so a phone's popover points at the Match it
+                    // deletes.
+                    .confirmationDialog(
+                        "Delete this Match?",
+                        isPresented: isDeleting(match),
+                        titleVisibility: .visible
+                    ) {
+                        Button("Delete Match", role: .destructive) {
+                            withAnimation { library.delete(match.id) }
+                        }
+                        Button("Cancel", role: .cancel) {}
+                    } message: {
+                        Text(match.isEnded
+                            ? "Its Scores will be gone for good."
+                            : "It is still in progress. Its Scores will be gone for good.")
+                    }
                 }
             }
         }
