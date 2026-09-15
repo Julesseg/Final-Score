@@ -6,9 +6,8 @@ import FinalScoreCore
 /// swiping a Round, or its menu, deletes it. What each gesture and key does is
 /// `Scorepad`'s business, in Core. In a Game that tracks the Dealer, a badge
 /// marks who deals each Round, and tapping it hands the deal to someone else.
-/// In a Game where one Team scores per Round, the keypad's place first asks
-/// which Team scored. Each Team's column wears its own colour, so its Total
-/// reads from across the table.
+/// Each Team's column wears its own colour, so its Total reads from across the
+/// table.
 struct ScorepadView: View {
     @Binding var match: Match
     /// Sets up a Rematch of the Match, once it is ended.
@@ -31,9 +30,9 @@ struct ScorepadView: View {
                         MatchBanner(match: scorepad.match, onEnd: { isConfirmingEnd = true }, onRematch: onRematch)
                         grid
                     }
-                    if showsEntry {
+                    if scorepad.selection != nil {
                         Divider()
-                        entry
+                        keypad
                             .frame(width: 280)
                     }
                 }
@@ -41,9 +40,9 @@ struct ScorepadView: View {
                 VStack(spacing: 0) {
                     MatchBanner(match: scorepad.match, onEnd: { isConfirmingEnd = true }, onRematch: onRematch)
                     grid
-                    if showsEntry {
+                    if scorepad.selection != nil {
                         Divider()
-                        entry
+                        keypad
                     }
                 }
             }
@@ -92,21 +91,6 @@ struct ScorepadView: View {
 
     // MARK: Keypad
 
-    /// What sits under the grid, or beside it in landscape: the keypad, the
-    /// question of who scored, or nothing.
-    @ViewBuilder
-    private var entry: some View {
-        if scorepad.selection != nil {
-            keypad
-        } else if let round = scorepad.roundAwaitingScoringTeam {
-            scoringTeamPicker(for: round)
-        }
-    }
-
-    private var showsEntry: Bool {
-        scorepad.selection != nil || scorepad.roundAwaitingScoringTeam != nil
-    }
-
     private var keypad: some View {
         KeypadView(target: $scorepad, title: keypadTitle, nextTitle: nextTitle) { scorepad.next() }
     }
@@ -118,49 +102,6 @@ struct ScorepadView: View {
               let round = scorepad.match.number(of: selection.round)
         else { return "" }
         return "\(team.name) · Round \(round)"
-    }
-
-    /// One button per Team; picking one opens the keypad on its Score.
-    private func scoringTeamPicker(for round: Round.ID) -> some View {
-        let isCompact = verticalSizeClass == .compact
-        return VStack(spacing: isCompact ? 6 : 8) {
-            HStack {
-                Text("Who scored Round \(scorepad.match.number(of: round) ?? 0)?")
-                    .font(.subheadline)
-                    .foregroundStyle(.secondary)
-                    .lineLimit(1)
-                    .accessibilityIdentifier("scoringTeamQuestion")
-                Spacer()
-                Button("Hide", systemImage: "chevron.down") { scorepad.deselect() }
-                    .labelStyle(.iconOnly)
-                    .accessibilityIdentifier("hideScoringTeamButton")
-            }
-            // Side by side under the grid; stacked in the narrow landscape panel.
-            ScrollView {
-                LazyVGrid(
-                    columns: [GridItem(.adaptive(minimum: isCompact ? 200 : 150), spacing: 8)],
-                    spacing: 8
-                ) {
-                    ForEach(Array(teams.enumerated()), id: \.element.id) { index, team in
-                        Button { scorepad.chooseScoringTeam(team.id) } label: {
-                            Text(team.name)
-                                .font(.headline)
-                                .lineLimit(2)
-                                .minimumScaleFactor(0.8)
-                                .frame(maxWidth: .infinity, minHeight: isCompact ? 44 : 56)
-                        }
-                        .buttonStyle(.bordered)
-                        .accessibilityIdentifier("scoringTeam.\(index)")
-                    }
-                }
-            }
-            .scrollBounceBehavior(.basedOnSize)
-            // Only as tall as its buttons under the grid, so the Rounds keep the room.
-            .fixedSize(horizontal: false, vertical: !isCompact)
-            if isCompact { Spacer(minLength: 0) }
-        }
-        .padding(12)
-        .background(.bar)
     }
 
     private var nextTitle: String {

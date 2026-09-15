@@ -33,7 +33,6 @@ public struct GameDraft: Hashable, Sendable {
             endCondition: .none,
             quickScores: [],
             allowsNegative: true,
-            scorers: .everyone,
             tracksDealer: true,
             isBuiltIn: false
         ))
@@ -130,14 +129,13 @@ public struct GameDraft: Hashable, Sendable {
 
     // MARK: Scoring
 
-    /// Rounds or a Tally. A Tally has no Rounds, so it drops the Dealer, gives
-    /// every Team its own Scores and loses a Round count.
+    /// Rounds or a Tally. A Tally has no Rounds, so it drops the Dealer and
+    /// loses a Round count.
     public var structure: Game.Structure {
         get { settings.structure }
         set {
             settings.structure = newValue
             tracksDealer = settings.tracksDealer
-            scorers = settings.scorers
             endCondition = settings.endCondition
         }
     }
@@ -146,12 +144,6 @@ public struct GameDraft: Hashable, Sendable {
     public var tracksDealer: Bool {
         get { settings.tracksDealer }
         set { settings.tracksDealer = newValue && structure == .rounds }
-    }
-
-    /// Only a Rounds Game can give each Round to one Team.
-    public var scorers: Game.Scorers {
-        get { settings.scorers }
-        set { settings.scorers = structure == .rounds ? newValue : .everyone }
     }
 
     /// Counts at least 1. A Tally never reaches a Round count, so it has none.

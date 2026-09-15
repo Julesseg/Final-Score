@@ -97,6 +97,21 @@ final class MatchStoreTests {
         #expect(restored.rounds.map(\.dealer) == [nil])
     }
 
+    @Test func aCoincheMatchSavedWhenOneTeamScoredEachRoundStillOpens() throws {
+        let match = Match(game: .coinche, teams: skyjoMatch().teams)
+        var game = try #require(try JSONSerialization.jsonObject(with: JSONEncoder().encode(Game.coinche)) as? [String: Any])
+        game["scorers"] = "oneTeamPerRound"
+        var snapshot = try #require(try JSONSerialization.jsonObject(with: JSONEncoder().encode(match)) as? [String: Any])
+        snapshot["game"] = game
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        try JSONSerialization.data(withJSONObject: snapshot)
+            .write(to: directory.appendingPathComponent("\(match.id.uuidString).json"))
+
+        let restored = try #require(MatchStore(directory: directory).matches.first)
+
+        #expect(restored.game == .coinche)
+    }
+
     @Test func savingAMatchAgainReplacesItsSnapshotRatherThanAddingOne() throws {
         let store = MatchStore(directory: directory)
         var match = skyjoMatch()

@@ -101,21 +101,6 @@ public struct Match: Codable, Hashable, Identifiable, Sendable {
         rounds[index].setScore(points, for: team)
     }
 
-    /// In a Game where only one Team scores each Round, gives the Round to this
-    /// Team: every other Team gets an explicit 0, and this one keeps any Score
-    /// it already has, or 0 until its points are entered. Does nothing in a
-    /// Game where every Team scores.
-    public mutating func setScoringTeam(_ team: Team.ID, inRound round: Round.ID) {
-        guard game.scorers == .oneTeamPerRound,
-              teams.contains(where: { $0.id == team }),
-              let index = rounds.firstIndex(where: { $0.id == round })
-        else { return }
-        for other in teams {
-            let points = other.id == team ? rounds[index].points(for: team) ?? 0 : 0
-            rounds[index].setScore(points, for: other.id)
-        }
-    }
-
     /// Reassigns who deals a Round — a misdeal, or a house rule like "the loser
     /// deals". Rounds already started keep their Dealer; the next new Round
     /// passes the deal on from whoever deals the last one. Only a seated

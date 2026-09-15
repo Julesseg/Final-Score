@@ -4,8 +4,8 @@ Card games are full of rules an app cannot feasibly encode: shooting the moon in
 Hearts, capot in Belote, Coinche's contract-and-chute scoring, Tarot's sliding
 target by number of bouts. We considered a small expression language and
 hand-written Swift per built-in Game, and rejected both. A `Game` is instead a
-fixed struct of eleven declarative fields — structure, team play, player count,
-direction, end condition, quick scores, negatives, scorers, dealer tracking, and
+fixed struct of declarative fields — structure, team play, player count,
+direction, end condition, quick scores, negatives, dealer tracking, and
 presentation — editable as a plain form.
 
 ## Consequences

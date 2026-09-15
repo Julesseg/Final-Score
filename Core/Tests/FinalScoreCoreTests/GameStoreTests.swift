@@ -146,6 +146,38 @@ final class GameStoreTests {
         #expect(reopened.total(for: reopened.teams[0].id) == 120)
     }
 
+    @Test func aCustomGameSavedWithTheRetiredOneTeamPerRoundSettingStillLoads() throws {
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        let saved = """
+        [{
+            "id": "6F9619FF-8B86-D011-B42D-00C04FC964FF",
+            "game": {
+                "name": "Contrée",
+                "symbol": "suit.spade.fill",
+                "accent": "indigo",
+                "structure": "rounds",
+                "teamPlay": {"teams": {"of": 2}},
+                "playerCount": [4, 4],
+                "direction": "highWins",
+                "endCondition": {"targetTotal": {"_0": 1000}},
+                "quickScores": [80, 90],
+                "allowsNegative": false,
+                "scorers": "oneTeamPerRound",
+                "tracksDealer": true,
+                "isBuiltIn": false
+            }
+        }]
+        """
+        try Data(saved.utf8).write(to: file)
+
+        let game = try #require(GameStore(file: file).customGames.first?.game)
+
+        #expect(game.name == "Contrée")
+        #expect(game.teamPlay == .teams(of: 2))
+        #expect(game.endCondition == .targetTotal(1000))
+        #expect(game.quickScores == [80, 90])
+    }
+
     @Test func aGamesFileThatCannotBeReadIsSetAsideRatherThanOverwritten() throws {
         try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
         let unreadable = Data("not a list of games".utf8)

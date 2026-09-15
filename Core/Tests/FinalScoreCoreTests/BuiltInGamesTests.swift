@@ -14,7 +14,6 @@ struct BuiltInGamesTests {
         #expect(skyjo.endCondition == .targetTotal(100))
         #expect(skyjo.quickScores.isEmpty, "A Skyjo Round can land anywhere from -24 up")
         #expect(skyjo.allowsNegative)
-        #expect(skyjo.scorers == .everyone)
         #expect(skyjo.tracksDealer)
         #expect(skyjo.isBuiltIn)
     }
@@ -29,7 +28,6 @@ struct BuiltInGamesTests {
         #expect(tarot.endCondition == .none)
         #expect(tarot.quickScores == [25, 50, 100, 150], "Each contract's worth against one defender")
         #expect(tarot.allowsNegative)
-        #expect(tarot.scorers == .everyone)
         #expect(tarot.tracksDealer)
         #expect(tarot.isBuiltIn)
     }
@@ -44,7 +42,6 @@ struct BuiltInGamesTests {
         #expect(rami.endCondition == .targetTotal(100))
         #expect(rami.quickScores.isEmpty, "Penalties are whatever is left in hand")
         #expect(rami.allowsNegative)
-        #expect(rami.scorers == .everyone)
         #expect(rami.tracksDealer)
         #expect(rami.isBuiltIn)
     }
@@ -59,7 +56,6 @@ struct BuiltInGamesTests {
         #expect(scrabble.endCondition == .none)
         #expect(scrabble.quickScores.isEmpty, "Word scores spread too widely to pick from")
         #expect(scrabble.allowsNegative, "Unplayed tiles are deducted at the end")
-        #expect(scrabble.scorers == .everyone)
         #expect(!scrabble.tracksDealer)
         #expect(scrabble.isBuiltIn)
     }
@@ -74,12 +70,11 @@ struct BuiltInGamesTests {
         #expect(belote.endCondition == .targetTotal(501))
         #expect(belote.quickScores.isEmpty, "A Round's points are counted off the cards, anywhere from 0 to 162")
         #expect(!belote.allowsNegative, "A Belote Team never scores below 0")
-        #expect(belote.scorers == .everyone, "Both Teams score the points they took")
         #expect(belote.tracksDealer)
         #expect(belote.isBuiltIn)
     }
 
-    @Test func coincheGivesEachRoundToTheOneTeamThatScoredIt() {
+    @Test func coincheIsPlayedInTeamsOfTwoToAThousand() {
         let coinche = Game.coinche
         #expect(coinche.name == "Coinche")
         #expect(coinche.structure == .rounds)
@@ -89,7 +84,6 @@ struct BuiltInGamesTests {
         #expect(coinche.endCondition == .targetTotal(1000))
         #expect(coinche.quickScores == [80, 90, 100, 110, 120, 130, 140, 150, 160], "The nine contracts")
         #expect(!coinche.allowsNegative)
-        #expect(coinche.scorers == .oneTeamPerRound, "A contract made or lost scores for one Team only")
         #expect(coinche.tracksDealer)
         #expect(coinche.isBuiltIn)
     }
@@ -104,7 +98,6 @@ struct BuiltInGamesTests {
         #expect(points.endCondition == .none, "A generic counter has no target of its own")
         #expect(points.quickScores.isEmpty)
         #expect(points.allowsNegative, "Points are taken away as well as added")
-        #expect(points.scorers == .everyone)
         #expect(!points.tracksDealer, "A Tally has no Rounds to deal")
         #expect(points.isBuiltIn)
     }

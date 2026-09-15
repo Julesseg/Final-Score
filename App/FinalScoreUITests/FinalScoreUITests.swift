@@ -311,7 +311,7 @@ final class FinalScoreUITests: XCTestCase {
         attachScreenshot(named: "Belote scorepad, landscape")
     }
 
-    func testScoringACoincheRoundAsksWhichTeamScored() throws {
+    func testCoincheScoresLikeAnyGame() throws {
         launch()
         scoreCoincheRounds()
         attachScreenshot(named: "Coinche scorepad, portrait")
@@ -915,9 +915,9 @@ final class FinalScoreUITests: XCTestCase {
         XCTAssertEqual(dealer(inRound: 2), "Linus", "The deal passes to seat 2 — a Player on the other Team")
     }
 
-    /// Coinche, where one Team scores each Round: the Round asks who scored
-    /// before the keypad opens, the other Team gets its 0 without a tap, and a
-    /// Score tapped on the grid is still typed over.
+    /// Coinche scores like any Game: a new Round opens the keypad on the first
+    /// Team, the user types the Score of the Team that made its contract, and
+    /// starting the next Round gives the other Team its 0.
     private func scoreCoincheRounds() {
         setUpMatch("Coinche", players: ["Ada", "Grace", "Linus", "Marie"])
         dismissNameField()
@@ -925,47 +925,35 @@ final class FinalScoreUITests: XCTestCase {
         XCTAssertEqual(app.staticTexts["teamName.0"].label, "Ada & Linus")
         XCTAssertEqual(app.staticTexts["teamName.1"].label, "Grace & Marie")
 
-        let question = app.staticTexts["scoringTeamQuestion"]
-        XCTAssertTrue(question.waitForExistence(timeout: 5))
-        XCTAssertEqual(question.label, "Who scored Round 1?")
-        XCTAssertFalse(app.buttons["key.next"].exists, "The keypad waits for a Team")
-        attachScreenshot(named: "Coinche asks who scored, \(orientationName)")
+        XCTAssertTrue(app.buttons["key.next"].waitForExistence(timeout: 5), "The keypad opens straight away")
+        XCTAssertTrue(app.staticTexts["Ada & Linus · Round 1"].exists, "The keypad is on the first Team")
 
         // Grace & Marie made an 80 contract.
-        tap("scoringTeam.1")
-        XCTAssertTrue(app.buttons["key.next"].waitForExistence(timeout: 5))
-        XCTAssertFalse(question.exists)
+        tap("score.1.1")
         XCTAssertEqual(app.buttons["quickScore.0"].label, "80", "The contracts are the Quick scores")
         tap("quickScore.0")
-
-        XCTAssertEqual(app.buttons["score.1.1"].value as? String, "80")
-        XCTAssertEqual(app.buttons["score.1.0"].value as? String, "0", "The other Team scores 0 untouched")
-        XCTAssertFalse(app.staticTexts["partialTotalsNotice"].exists, "The Round is fully scored")
         XCTAssertEqual(total(1), "80")
-        attachScreenshot(named: "Coinche keypad on the scoring Team, \(orientationName)")
+        XCTAssertEqual(app.buttons["score.1.0"].value as? String, "Not scored")
+        attachScreenshot(named: "Coinche Round 1 scored for one Team, \(orientationName)")
 
-        // Next skips the Team already on 0 and asks about Round 2.
+        // Starting Round 2 gives Ada & Linus their 0. On a small phone the
+        // keypad and its contracts squeeze Round 1 out of the grid: put it
+        // away to read the Score.
         XCTAssertEqual(app.buttons["key.next"].label, "New Round")
         press("next")
-        XCTAssertTrue(question.waitForExistence(timeout: 5))
-        XCTAssertEqual(question.label, "Who scored Round 2?")
+        XCTAssertTrue(app.staticTexts["Ada & Linus · Round 2"].exists, "The keypad is on the first Team")
+        hideKeypad()
+        XCTAssertEqual(app.buttons["score.1.0"].value as? String, "0", "The other Team gets an explicit 0")
+        XCTAssertFalse(app.staticTexts["partialTotalsNotice"].exists, "Round 1 is fully scored")
 
-        // Put away unanswered, the question is still answered by tapping a
-        // Score: Ada & Linus, 130.
-        tap("hideScoringTeamButton")
-        XCTAssertTrue(question.waitForNonExistence(timeout: 5))
+        // Ada & Linus take Round 2 with 130.
         tap("score.2.0")
         press("1", "3", "0")
         XCTAssertEqual(total(0), "130")
-        // On a small phone the keypad and its contracts squeeze Round 2 out of
-        // the grid: put it away to read the other Team's Score.
-        hideKeypad()
-        XCTAssertEqual(app.buttons["score.2.1"].value as? String, "0")
         XCTAssertTrue(app.images["leader.0"].exists)
 
         // The keypad Override still reaches the other Team: 20 for belote in defence.
-        tap("score.2.1")
-        press("2", "0")
+        press("next", "2", "0")
         XCTAssertEqual(total(1), "100")
         XCTAssertEqual(total(0), "130")
     }

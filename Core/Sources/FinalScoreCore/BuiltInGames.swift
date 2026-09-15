@@ -17,7 +17,6 @@ extension Game {
         // took, so a Score lands anywhere in that range and is always typed.
         quickScores: [],
         allowsNegative: false,
-        scorers: .everyone,
         tracksDealer: true,
         isBuiltIn: true
     )
@@ -35,9 +34,6 @@ extension Game {
         // doubling the stakes and the points taken in defence are typed.
         quickScores: Array(stride(from: 80, through: 160, by: 10)),
         allowsNegative: false,
-        // A Round goes to the Team that made its contract, or to the defence
-        // when it fell.
-        scorers: .oneTeamPerRound,
         tracksDealer: true,
         isBuiltIn: true
     )
@@ -55,7 +51,6 @@ extension Game {
         // each defender when made or lost by nothing. Other Scores are typed.
         quickScores: [25, 50, 100, 150],
         allowsNegative: true,
-        scorers: .everyone,
         tracksDealer: true,
         isBuiltIn: true
     )
@@ -71,7 +66,6 @@ extension Game {
         endCondition: .targetTotal(100),
         quickScores: [],
         allowsNegative: true,
-        scorers: .everyone,
         tracksDealer: true,
         isBuiltIn: true
     )
@@ -87,7 +81,6 @@ extension Game {
         endCondition: .targetTotal(100),
         quickScores: [],
         allowsNegative: true,
-        scorers: .everyone,
         tracksDealer: true,
         isBuiltIn: true
     )
@@ -103,7 +96,6 @@ extension Game {
         endCondition: .none,
         quickScores: [],
         allowsNegative: true,
-        scorers: .everyone,
         tracksDealer: false,
         isBuiltIn: true
     )
@@ -120,7 +112,6 @@ extension Game {
         endCondition: .none,
         quickScores: [],
         allowsNegative: true,
-        scorers: .everyone,
         tracksDealer: false,
         isBuiltIn: true
     )

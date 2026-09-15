@@ -16,7 +16,6 @@ public struct Game: Codable, Hashable, Sendable {
     /// One-tap values offered on the scorepad; empty hides them.
     public var quickScores: [Int]
     public var allowsNegative: Bool
-    public var scorers: Scorers
     public var tracksDealer: Bool
     public var isBuiltIn: Bool
 
@@ -31,7 +30,6 @@ public struct Game: Codable, Hashable, Sendable {
         endCondition: EndCondition,
         quickScores: [Int],
         allowsNegative: Bool,
-        scorers: Scorers,
         tracksDealer: Bool,
         isBuiltIn: Bool
     ) {
@@ -45,7 +43,6 @@ public struct Game: Codable, Hashable, Sendable {
         self.endCondition = endCondition
         self.quickScores = quickScores
         self.allowsNegative = allowsNegative
-        self.scorers = scorers
         self.tracksDealer = tracksDealer
         self.isBuiltIn = isBuiltIn
     }
@@ -87,12 +84,5 @@ public struct Game: Codable, Hashable, Sendable {
         case none
         case targetTotal(Int)
         case roundCount(Int)
-    }
-
-    public enum Scorers: String, Codable, Hashable, Sendable {
-        /// Every Team gets a Score each Round.
-        case everyone
-        /// Only one Team scores each Round; every other Team gets 0.
-        case oneTeamPerRound
     }
 }
