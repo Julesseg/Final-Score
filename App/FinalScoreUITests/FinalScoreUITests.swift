@@ -101,6 +101,30 @@ final class FinalScoreUITests: XCTestCase {
         startRoundsFromThePlusRow()
     }
 
+    // PROTOTYPE: steps through the New Round row variants for screenshots.
+    func testZZPrototypeNewRoundVariants() throws {
+        launch()
+        startMatch("Skyjo", players: ["Ada", "Grace", "Linus"])
+        press("4", "next", "9", "next", "2", "next")
+        hideKeypad()
+        for _ in 0..<4 where !app.staticTexts["prototype.variant"].label.hasPrefix("A") {
+            tap("prototype.next")
+        }
+        for orientation in ["portrait", "landscape"] {
+            if orientation == "landscape" {
+                XCUIDevice.shared.orientation = .landscapeLeft
+                sleep(3)
+            }
+            for variant in ["A", "B", "C", "D"] {
+                XCTAssertTrue(app.staticTexts["prototype.variant"].label.hasPrefix(variant))
+                print("SHOT-STATE \(orientation)-\(variant)")
+                sleep(6)
+                tap("prototype.next")
+            }
+        }
+        print("SHOT-STATE done")
+    }
+
     func testCorrectingAnOldScoreAndDeletingARoundRecomputeTheTotals() throws {
         launch()
         correctAnOldScoreAndDeleteARound()

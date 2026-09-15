@@ -16,6 +16,8 @@ struct ScorepadView: View {
     @State private var scorepad: Scorepad
     @State private var isConfirmingEnd = false
     @Environment(\.verticalSizeClass) private var verticalSizeClass
+    // PROTOTYPE: which New Round row variant to draw.
+    @AppStorage("prototype.newRoundVariant") private var prototypeVariant: NewRoundVariant = .a
 
     init(match: Binding<Match>, onRematch: @escaping () -> Void) {
         _match = match
@@ -49,6 +51,13 @@ struct ScorepadView: View {
             }
         }
         .tint(game.accent.color)
+        #if DEBUG
+        .overlay(alignment: .bottom) {
+            if !scorepad.match.isEnded {
+                NewRoundVariantSwitcher(variant: $prototypeVariant)
+            }
+        }
+        #endif
         .celebrating(scorepad.match)
         .navigationTitle(game.name)
         .navigationBarTitleDisplayMode(.inline)
@@ -131,7 +140,7 @@ struct ScorepadView: View {
                                     .id(round.id)
                             }
                             if !scorepad.match.isEnded {
-                                newRoundRow(visibleWidth: proxy.size.width)
+                                newRoundRow(visibleWidth: proxy.size.width, columnWidth: columnWidth)
                                     .id(Self.newRoundRowID)
                             }
                         }
@@ -201,18 +210,19 @@ struct ScorepadView: View {
     /// shaped like a Score's, whose + starts it, giving 0 to every Team still
     /// unscored in the Round before. The + centres on the screen, not on a
     /// grid of Teams wider than it.
-    private func newRoundRow(visibleWidth: CGFloat) -> some View {
+    private func newRoundRow(visibleWidth: CGFloat, columnWidth: CGFloat) -> some View {
         Button {
             scorepad.startNewRound()
         } label: {
-            Image(systemName: "plus")
-                .font(.title3.weight(.semibold))
-                .foregroundStyle(.tint)
-                .frame(width: max(visibleWidth - 6, 0), height: 44)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .background(RoundedRectangle(cornerRadius: 8).fill(.fill.tertiary))
-                .contentShape(RoundedRectangle(cornerRadius: 8))
-                .padding(.horizontal, 3)
+            NewRoundRowPrototypeLabel(
+                variant: prototypeVariant,
+                info: NextRoundInfo(
+                    match: scorepad.match,
+                    roundColumnWidth: Self.roundColumnWidth,
+                    columnWidth: columnWidth,
+                    visibleWidth: visibleWidth
+                )
+            )
         }
         .buttonStyle(.plain)
         .padding(.vertical, 2)
