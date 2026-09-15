@@ -956,6 +956,7 @@ final class FinalScoreUITests: XCTestCase {
         XCTAssertEqual(app.buttons["score.2.0"].value as? String, "0")
         XCTAssertEqual(app.buttons["score.2.1"].value as? String, "0")
         XCTAssertFalse(app.staticTexts["partialTotalsNotice"].exists)
+        attachScreenshot(named: "Round 3 started from the + row, \(orientationName)")
 
         // The keypad's Next still offers New Round at the end of the row.
         press("next")
@@ -967,6 +968,7 @@ final class FinalScoreUITests: XCTestCase {
         app.buttons["endMatchButton"].tap()
         confirmEndMatch()
         XCTAssertTrue(app.buttons["newRoundButton"].waitForNonExistence(timeout: 5), "An ended Match has no + row")
+        attachScreenshot(named: "Ended Match without the + row, \(orientationName)")
     }
 
     /// Coinche scores like any Game: a new Round opens the keypad on the first
