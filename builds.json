@@ -1,0 +1,32 @@
+[
+  {
+    "pr": 41,
+    "title": "feat(app): New Round is a + row in the grid, always available",
+    "sha": "e4a138b",
+    "time": "2026-09-15T20:27:33.336Z"
+  },
+  {
+    "pr": 44,
+    "title": "feat(app): slide the keypad in and out",
+    "sha": "7c29593",
+    "time": "2026-09-15T15:57:10.885Z"
+  },
+  {
+    "pr": 43,
+    "title": "feat(app): tint Tally − / + in the Team's colour, and let the Total open the keypad",
+    "sha": "cca3235",
+    "time": "2026-09-15T14:41:07.908Z"
+  },
+  {
+    "pr": 40,
+    "title": "feat: delete a Match from the list, and make New Match a glass +",
+    "sha": "d4c2337",
+    "time": "2026-09-15T13:21:21.308Z"
+  },
+  {
+    "pr": 34,
+    "title": "feat(app): colour each Team, spring each Score, and celebrate the end",
+    "sha": "5e0cf52",
+    "time": "2026-09-14T14:13:08.581Z"
+  }
+]
