@@ -516,7 +516,87 @@ final class FinalScoreUITests: XCTestCase {
         rematchAFinishedBeloteMatch()
     }
 
+    func testAMatchIsDeletedFromTheListBySwipeOrMenuAfterConfirming() throws {
+        launch()
+        startMatch("Skyjo", players: ["Linus", "Marie"])
+        press("3", "next", "4", "next")
+        app.buttons["endMatchButton"].tap()
+        confirmEndMatch()
+        XCTAssertTrue(element("outcome").waitForExistence(timeout: 5))
+        backToList()
+        startMatch("Skyjo", players: ["Ada", "Grace"])
+        press("5")
+        backToList()
+
+        let rows = app.buttons.matching(identifier: "matchRow")
+        XCTAssertTrue(rows.element(boundBy: 1).waitForExistence(timeout: 5))
+        let inProgress = rows.element(boundBy: 0)
+        XCTAssertTrue(inProgress.label.contains("Ada"))
+
+        // A partial swipe reveals Delete; Cancel leaves the Match where it was.
+        inProgress.swipeLeft()
+        let swipeDelete = app.buttons["Delete"]
+        XCTAssertTrue(swipeDelete.waitForExistence(timeout: 5))
+        swipeDelete.tap()
+        XCTAssertTrue(
+            app.staticTexts["It is still in progress. Its Scores will be gone for good."].waitForExistence(timeout: 5),
+            "The dialog notes the Match is still in progress"
+        )
+        attachScreenshot(named: "Delete a Match in progress, portrait")
+        cancelDeleteMatch()
+        XCTAssertEqual(rows.count, 2, "Cancel leaves the Match untouched")
+        XCTAssertTrue(rows.element(boundBy: 0).label.contains("Ada"))
+
+        // A full swipe asks too, here on the finished Match.
+        let finished = rows.element(boundBy: 1)
+        XCTAssertTrue(finished.label.contains("Linus"))
+        finished.coordinate(withNormalizedOffset: CGVector(dx: 0.95, dy: 0.5))
+            .press(forDuration: 0.05, thenDragTo: finished.coordinate(withNormalizedOffset: CGVector(dx: -0.05, dy: 0.5)))
+        XCTAssertTrue(app.staticTexts["Its Scores will be gone for good."].waitForExistence(timeout: 5))
+        confirmDeleteMatch()
+        XCTAssertTrue(rows.element(boundBy: 1).waitForNonExistence(timeout: 5))
+        XCTAssertTrue(rows.element(boundBy: 0).label.contains("Ada"), "Only the finished Match went")
+
+        // The long-press menu offers Delete as well.
+        rows.element(boundBy: 0).press(forDuration: 1.2)
+        let menuDelete = app.buttons["Delete"]
+        XCTAssertTrue(menuDelete.waitForExistence(timeout: 5))
+        menuDelete.tap()
+        XCTAssertTrue(app.buttons["Delete Match"].waitForExistence(timeout: 5))
+        attachScreenshot(named: "Delete a Match from its menu, portrait")
+        confirmDeleteMatch()
+        XCTAssertTrue(app.buttons["gameCard.Skyjo"].waitForExistence(timeout: 5), "With no Matches left, the Game cards return")
+        assertNewMatchIsPinnedToTheBottom()
+
+        app.terminate()
+        app.launch()
+
+        XCTAssertTrue(app.buttons["gameCard.Skyjo"].waitForExistence(timeout: 10))
+        XCTAssertFalse(app.buttons["matchRow"].exists, "A deleted Match stays gone after a relaunch")
+    }
+
     // MARK: Helpers
+
+    private func confirmDeleteMatch() {
+        let confirm = app.buttons["Delete Match"]
+        XCTAssertTrue(confirm.waitForExistence(timeout: 5))
+        confirm.tap()
+        XCTAssertTrue(confirm.waitForNonExistence(timeout: 5))
+    }
+
+    /// Cancels the delete dialog. A phone shows it as a popover from the row,
+    /// where Cancel is a tap outside it rather than a button.
+    private func cancelDeleteMatch() {
+        let delete = app.buttons["Delete Match"]
+        XCTAssertTrue(delete.waitForExistence(timeout: 5))
+        let cancel = app.buttons["Cancel"]
+        if cancel.exists {
+            cancel.tap()
+        } else {
+            app.otherElements["PopoverDismissRegion"].firstMatch.tap()
+        }
+        XCTAssertTrue(delete.waitForNonExistence(timeout: 5))
+    }
 
     /// Opens the Game picker from New Match.
     private func openGamePicker() {
@@ -710,6 +790,9 @@ final class FinalScoreUITests: XCTestCase {
         XCTAssertTrue(newMatch.isHittable)
         let window = app.windows.firstMatch.frame
         XCTAssertGreaterThan(newMatch.frame.minY, window.maxY - 120, "New Match sits at the bottom, within thumb reach")
+        XCTAssertEqual(newMatch.label, "New Match")
+        XCTAssertEqual(newMatch.frame.width, newMatch.frame.height, accuracy: 1, "New Match is a round + button")
+        XCTAssertEqual(newMatch.frame.midX, window.midX, accuracy: 2, "New Match is centered")
     }
 
     /// Scores three Rounds of Skyjo, retypes a Score from the first and deletes
