@@ -136,10 +136,22 @@ struct ScorepadView: View {
                             }
                         }
                         .listStyle(.plain)
-                        // Down to the + row, so the new Round shows with the way to the next one.
-                        .onChange(of: scorepad.match.rounds.count) { previous, count in
-                            guard count > previous, !scorepad.match.isEnded else { return }
-                            withAnimation { scroller.scrollTo(Self.newRoundRowID, anchor: .bottom) }
+                        // Keeps the Round being typed in view once the keypad
+                        // has taken its room, which on a small phone leaves the
+                        // grid only a couple of rows: the Round in play down to
+                        // the + row under it, an earlier one just into view.
+                        .onChange(of: scorepad.selection?.round) { _, round in
+                            guard let round else { return }
+                            let isInPlay = round == scorepad.match.rounds.last?.id && !scorepad.match.isEnded
+                            DispatchQueue.main.async {
+                                withAnimation {
+                                    if isInPlay {
+                                        scroller.scrollTo(Self.newRoundRowID, anchor: .bottom)
+                                    } else {
+                                        scroller.scrollTo(round)
+                                    }
+                                }
+                            }
                         }
                     }
                     Divider()

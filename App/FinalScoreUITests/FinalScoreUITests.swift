@@ -942,19 +942,21 @@ final class FinalScoreUITests: XCTestCase {
         tap("newRoundButton")
 
         XCTAssertTrue(app.buttons["key.next"].waitForExistence(timeout: 5), "Round 2 opens on Ada")
+        XCTAssertTrue(app.buttons["score.2.0"].isHittable, "The grid scrolls to the new Round")
+        XCTAssertEqual(app.buttons["score.2.0"].value as? String, "Not scored")
+        // On a small phone the keypad leaves the grid room for the Round being
+        // typed only: put it away to read Round 1.
+        hideKeypad()
         XCTAssertEqual(app.buttons["score.1.0"].value as? String, "5")
         XCTAssertEqual(app.buttons["score.1.1"].value as? String, "0", "Grace's unscored Round 1 becomes 0")
-        XCTAssertEqual(app.buttons["score.2.0"].value as? String, "Not scored")
 
         // Round 2 goes untouched: + leaves it a row of zeros and opens Round 3.
-        hideKeypad()
         tap("newRoundButton")
 
         let third = app.buttons["score.3.0"]
         XCTAssertTrue(third.waitForExistence(timeout: 5))
         XCTAssertTrue(third.isHittable, "The grid scrolls to the new Round")
-        XCTAssertEqual(app.buttons["score.2.0"].value as? String, "0")
-        XCTAssertEqual(app.buttons["score.2.1"].value as? String, "0")
+        XCTAssertTrue(app.buttons["newRoundButton"].isHittable, "The + row shows under it")
         XCTAssertFalse(app.staticTexts["partialTotalsNotice"].exists)
         attachScreenshot(named: "Round 3 started from the + row, \(orientationName)")
 
@@ -962,6 +964,8 @@ final class FinalScoreUITests: XCTestCase {
         press("next")
         XCTAssertEqual(app.buttons["key.next"].label, "New Round")
         hideKeypad()
+        XCTAssertEqual(app.buttons["score.2.0"].value as? String, "0")
+        XCTAssertEqual(app.buttons["score.2.1"].value as? String, "0")
         XCTAssertTrue(app.buttons["newRoundButton"].isHittable)
         attachScreenshot(named: "New Round + row, \(orientationName)")
 
