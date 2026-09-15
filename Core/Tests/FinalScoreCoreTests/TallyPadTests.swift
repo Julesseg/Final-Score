@@ -79,6 +79,25 @@ struct TallyPadTests {
         #expect(pad.selectedTeam == ada)
     }
 
+    @Test func aNewScoreIsStillBeingAddedOnceItsFirstKeyRecordsIt() {
+        var pad = TallyPad(match: pointsMatch())
+        let grace = pad.match.teams[1].id
+        #expect(!pad.isAddingScore)
+
+        pad.select(.newScore(team: grace))
+        #expect(pad.isAddingScore)
+        pad.type(1)
+        pad.type(2)
+        #expect(pad.selection == .recorded(0))
+        #expect(pad.isAddingScore)
+
+        pad.select(.recorded(0))
+        #expect(!pad.isAddingScore, "Selecting a recorded Score corrects it")
+        pad.select(.newScore(team: grace))
+        pad.deselect()
+        #expect(!pad.isAddingScore)
+    }
+
     @Test func theSignKeyTakesPointsAway() {
         var pad = TallyPad(match: pointsMatch())
         let ada = pad.match.teams[0].id

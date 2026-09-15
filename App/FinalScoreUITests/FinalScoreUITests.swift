@@ -353,7 +353,7 @@ final class FinalScoreUITests: XCTestCase {
         XCTAssertTrue(row.waitForExistence(timeout: 5))
         XCTAssertEqual(app.staticTexts["matchStatus"].label, "Grace leads 19", "A Tally has no Round to report")
         row.tap()
-        XCTAssertTrue(app.staticTexts["total.1"].waitForExistence(timeout: 5), "A Tally Match reopens on the Tally view")
+        XCTAssertTrue(element("total.1").waitForExistence(timeout: 5), "A Tally Match reopens on the Tally view")
         XCTAssertEqual(total(0), "3")
         XCTAssertEqual(total(1), "19")
     }
@@ -371,6 +371,9 @@ final class FinalScoreUITests: XCTestCase {
         XCTAssertTrue(outcome.waitForExistence(timeout: 5))
         XCTAssertTrue(outcome.label.contains("Grace wins"))
         XCTAssertFalse(app.buttons["plus.0"].exists, "No Score is added to an ended Match")
+        XCTAssertFalse(app.buttons["total.0"].exists, "An ended Match's Total is only a number")
+        app.staticTexts["total.0"].tap()
+        XCTAssertFalse(app.buttons["key.next"].waitForExistence(timeout: 2), "Tapping an ended Total opens no keypad")
         attachScreenshot(named: "Tally ended, landscape")
     }
 
@@ -1003,7 +1006,7 @@ final class FinalScoreUITests: XCTestCase {
         return badge.value as? String
     }
 
-    /// Three +1 for Ada, a −1 then a keypad 12 for Grace, and no Round or
+    /// Three +1 for Ada, a −1 then a 12 typed on Grace's Total, and no Round or
     /// Dealer anywhere.
     private func scorePointsWithPlusMinusAndTheKeypad() {
         XCTAssertFalse(app.buttons["key.next"].exists, "A Tally opens with the keypad away")
@@ -1017,9 +1020,16 @@ final class FinalScoreUITests: XCTestCase {
         XCTAssertEqual(total(1), "-1")
         XCTAssertTrue(app.images["leader.0"].exists, "Highest Total leads in Points")
 
-        tap("keypad.1")
+        XCTAssertFalse(app.buttons["keypad.1"].exists, "The Total opens the keypad: no # button")
+        let graceTotal = app.buttons["total.1"]
+        XCTAssertEqual(graceTotal.label, "Enter a Score for Grace")
+        XCTAssertEqual(graceTotal.value as? String, "-1")
+        graceTotal.tap()
+        XCTAssertEqual(app.staticTexts["keypadTitle"].label, "Add to Grace")
         press("1", "2")
         XCTAssertEqual(total(1), "11", "The keypad lands its Score as typed")
+        XCTAssertEqual(app.staticTexts["keypadTitle"].label, "Add to Grace", "Still adding once the first key records the Score")
+        attachScreenshot(named: "Tally adding a Score, \(orientationName)")
         press("next")
         XCTAssertFalse(app.buttons["key.next"].exists, "Done puts the keypad away")
 
@@ -1032,6 +1042,11 @@ final class FinalScoreUITests: XCTestCase {
         XCTAssertTrue(history.waitForExistence(timeout: 5))
         XCTAssertEqual(history.value as? String, "+12")
         XCTAssertEqual(app.buttons["history.3"].value as? String, "-1")
+
+        history.tap()
+        XCTAssertEqual(app.staticTexts["keypadTitle"].label, "Grace", "A recorded Score is titled with its Team alone")
+        attachScreenshot(named: "Tally correcting a Score, \(orientationName)")
+        hideKeypad()
     }
 
     /// Scrolls the board down until the element is on screen: on a short
@@ -1127,7 +1142,7 @@ final class FinalScoreUITests: XCTestCase {
 
     private func tapStart() {
         app.buttons["startMatchButton"].tap()
-        XCTAssertTrue(app.staticTexts["total.0"].waitForExistence(timeout: 5))
+        XCTAssertTrue(element("total.0").waitForExistence(timeout: 5))
     }
 
     private func openSetup(_ game: String) {
@@ -1171,8 +1186,11 @@ final class FinalScoreUITests: XCTestCase {
         app.descendants(matching: .any)[identifier].firstMatch
     }
 
+    /// A Tally's Total is a button, whose value is the number, while its
+    /// Match is in play; everywhere else it is text.
     private func total(_ teamIndex: Int) -> String {
-        app.staticTexts["total.\(teamIndex)"].label
+        let tallyTotal = app.buttons["total.\(teamIndex)"]
+        return tallyTotal.exists ? tallyTotal.value as? String ?? "" : app.staticTexts["total.\(teamIndex)"].label
     }
 
     /// Kept in the result bundle CI uploads, so a layout can be checked by eye.

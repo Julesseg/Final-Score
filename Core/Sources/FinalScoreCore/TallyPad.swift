@@ -15,6 +15,9 @@ public struct TallyPad: Sendable {
     public private(set) var match: Match
     /// Nil while the keypad is put away.
     public private(set) var selection: Selection?
+    /// Whether the keypad was opened to add a Score rather than to correct
+    /// one. Still true once its first key records the Score.
+    public private(set) var isAddingScore = false
     private var typed = Override()
 
     /// Opens with the keypad away: − / + are the way most Scores go in.
@@ -69,6 +72,10 @@ public struct TallyPad: Sendable {
             newSelection = .recorded(index - 1)
         }
         selection = newSelection
+        isAddingScore = switch newSelection {
+        case .newScore: true
+        case .recorded: false
+        }
         typed = switch newSelection {
         case .newScore: Override()
         case .recorded(let index): Override(points: match.tallyScores[index].points)
@@ -114,6 +121,7 @@ public struct TallyPad: Sendable {
     public mutating func deselect() {
         _ = removeZeroSelection()
         selection = nil
+        isAddingScore = false
     }
 
     /// Ends the Match and puts the keypad away. Recorded Scores can still be
