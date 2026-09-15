@@ -197,10 +197,10 @@ struct ScorepadView: View {
 
     private static let newRoundRowID = "newRoundRow"
 
-    /// Where the next Round's row will go: a grey cell across the whole width,
-    /// shaped like a Score's, whose + starts it, giving 0 to every Team still
-    /// unscored in the Round before. The + centres on the screen, not on a
-    /// grid of Teams wider than it.
+    /// Where the next Round's row will go: a faint, dashed cell across the
+    /// whole width, shaped like a Score's, whose + starts it, giving 0 to every
+    /// Team still unscored in the Round before. The + centres on the screen,
+    /// not on a grid of Teams wider than it.
     private func newRoundRow(visibleWidth: CGFloat) -> some View {
         Button {
             scorepad.startNewRound()
@@ -210,7 +210,11 @@ struct ScorepadView: View {
                 .foregroundStyle(.tint)
                 .frame(width: max(visibleWidth - 6, 0), height: 44)
                 .frame(maxWidth: .infinity, alignment: .leading)
-                .background(RoundedRectangle(cornerRadius: 8).fill(.fill.tertiary))
+                .background {
+                    RoundedRectangle(cornerRadius: 8).fill(.tint.opacity(0.05))
+                    RoundedRectangle(cornerRadius: 8)
+                        .strokeBorder(.tint.opacity(0.45), style: StrokeStyle(lineWidth: 1.5, dash: [5, 4]))
+                }
                 .contentShape(RoundedRectangle(cornerRadius: 8))
                 .padding(.horizontal, 3)
         }
