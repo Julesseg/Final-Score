@@ -141,19 +141,13 @@ public struct Match: Codable, Hashable, Identifiable, Sendable {
         rounds.firstIndex { $0.id == round }.map { $0 + 1 }
     }
 
-    /// A new Round is offered once the last one has at least one Score, so the
-    /// scorepad never stacks up empty rows. Never in a Tally.
-    public var canStartNewRound: Bool {
-        guard game.structure == .rounds else { return false }
-        return rounds.last.map { !$0.scores.isEmpty } ?? true
-    }
-
     /// Moves on to a new Round, dealt by the seat after the last Round's
     /// Dealer. Moving on means every Team still unscored in the last Round
     /// scored nothing, so each gets an explicit 0: only the Round in play is
-    /// ever partly filled.
+    /// ever partly filled, and a Round nobody scored stays as a row of zeros.
+    /// Never refused in a Rounds Match; does nothing in a Tally.
     public mutating func startNewRound() {
-        guard canStartNewRound else { return }
+        guard game.structure == .rounds else { return }
         zeroUnscoredTeamsInLastRound()
         let dealer = rounds.last?.dealer.flatMap { seating?.dealer(after: $0) }
         rounds.append(Round(dealer: dealer))

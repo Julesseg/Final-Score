@@ -91,6 +91,16 @@ final class FinalScoreUITests: XCTestCase {
         attachScreenshot(named: "Scorepad, landscape")
     }
 
+    func testThePlusRowStartsARoundAndGoesOnceTheMatchEnds() throws {
+        launch()
+        startRoundsFromThePlusRow()
+    }
+
+    func testThePlusRowWorksInLandscape() throws {
+        launch(in: .landscapeLeft)
+        startRoundsFromThePlusRow()
+    }
+
     func testCorrectingAnOldScoreAndDeletingARoundRecomputeTheTotals() throws {
         launch()
         correctAnOldScoreAndDeleteARound()
@@ -916,6 +926,47 @@ final class FinalScoreUITests: XCTestCase {
         app.buttons["newRoundButton"].tap()
         hideKeypad()
         XCTAssertEqual(dealer(inRound: 2), "Linus", "The deal passes to seat 2 — a Player on the other Team")
+    }
+
+    /// New Round lives in the grid, not the toolbar: the + row under the last
+    /// Round starts the next one whatever is scored, zeroing whoever wasn't,
+    /// and goes away with the Match.
+    private func startRoundsFromThePlusRow() {
+        startMatch("Skyjo", players: ["Ada", "Grace"])
+        XCTAssertTrue(app.buttons["endMatchButton"].exists)
+        XCTAssertFalse(app.navigationBars.buttons["New Round"].exists, "End Match is the toolbar's only action")
+
+        // Ada scores 5; Grace hasn't played when the + row is tapped.
+        press("5")
+        hideKeypad()
+        tap("newRoundButton")
+
+        XCTAssertTrue(app.buttons["key.next"].waitForExistence(timeout: 5), "Round 2 opens on Ada")
+        XCTAssertEqual(app.buttons["score.1.0"].value as? String, "5")
+        XCTAssertEqual(app.buttons["score.1.1"].value as? String, "0", "Grace's unscored Round 1 becomes 0")
+        XCTAssertEqual(app.buttons["score.2.0"].value as? String, "Not scored")
+
+        // Round 2 goes untouched: + leaves it a row of zeros and opens Round 3.
+        hideKeypad()
+        tap("newRoundButton")
+
+        let third = app.buttons["score.3.0"]
+        XCTAssertTrue(third.waitForExistence(timeout: 5))
+        XCTAssertTrue(third.isHittable, "The grid scrolls to the new Round")
+        XCTAssertEqual(app.buttons["score.2.0"].value as? String, "0")
+        XCTAssertEqual(app.buttons["score.2.1"].value as? String, "0")
+        XCTAssertFalse(app.staticTexts["partialTotalsNotice"].exists)
+
+        // The keypad's Next still offers New Round at the end of the row.
+        press("next")
+        XCTAssertEqual(app.buttons["key.next"].label, "New Round")
+        hideKeypad()
+        XCTAssertTrue(app.buttons["newRoundButton"].isHittable)
+        attachScreenshot(named: "New Round + row, \(orientationName)")
+
+        app.buttons["endMatchButton"].tap()
+        confirmEndMatch()
+        XCTAssertTrue(app.buttons["newRoundButton"].waitForNonExistence(timeout: 5), "An ended Match has no + row")
     }
 
     /// Coinche scores like any Game: a new Round opens the keypad on the first

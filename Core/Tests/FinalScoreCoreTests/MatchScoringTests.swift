@@ -178,7 +178,6 @@ struct MatchScoringTests {
 
         #expect(match.rounds.count == 1)
         #expect(!match.totalsArePartial)
-        #expect(match.canStartNewRound)
     }
 
     @Test func deletingTheOnlyRoundLeavesAnEmptyOneToScore() {
@@ -233,18 +232,26 @@ struct MatchScoringTests {
         #expect(skyjoMatch().leadingTotal == nil)
     }
 
-    @Test func aNewRoundWaitsUntilTheLastOneHasAScore() {
+    @Test func startingARoundOnAnEmptyRoundLeavesARowOfZeros() {
         var match = skyjoMatch()
-        #expect(!match.canStartNewRound)
 
         match.startNewRound()
-        #expect(match.rounds.count == 1)
 
-        match.setScore(3, for: match.teams[0].id, inRound: match.rounds[0].id)
-        #expect(match.canStartNewRound)
-        match.startNewRound()
         #expect(match.rounds.count == 2)
-        #expect(!match.canStartNewRound)
+        #expect(match.rounds[0].scores.map(\.points) == [0, 0, 0])
+        #expect(match.rounds[1].scores.isEmpty)
+    }
+
+    @Test func aRoundCanStartAfterEveryRoundBeforeItWentUnscored() {
+        var match = skyjoMatch()
+
+        match.startNewRound()
+        match.startNewRound()
+        match.startNewRound()
+
+        #expect(match.rounds.count == 4)
+        #expect(match.rounds.dropLast().allSatisfy { $0.scores.map(\.points) == [0, 0, 0] })
+        #expect(!match.totalsArePartial)
     }
 
     @Test func aMatchMidRoundSurvivesAJSONRoundTrip() throws {
