@@ -30,12 +30,11 @@ struct MatchListView: View {
                     Image(systemName: "plus")
                         .font(.title2.weight(.semibold))
                         .foregroundStyle(.primary)
-                        .frame(width: 60, height: 60)
-                        .contentShape(.circle)
+                        .frame(width: 44, height: 44)
                 }
-                .buttonStyle(.plain)
-                // Clear rather than tinted, so the list shows through it.
-                .glassEffect(.clear.interactive(), in: .circle)
+                .modifier(ClearGlassButtonStyle())
+                .buttonBorderShape(.circle)
+                .controlSize(.large)
                 .accessibilityLabel("New Match")
                 .accessibilityIdentifier("newMatchButton")
                 .padding(.bottom, 8)
@@ -133,6 +132,20 @@ struct MatchListView: View {
                     }
                 }
             }
+        }
+    }
+}
+
+/// Glass drawn by the button style itself, so the button owns the tap: an
+/// interactive `glassEffect` over a plain button can take a quick tap without
+/// the button firing. Clear rather than tinted, so the list shows through,
+/// where the OS offers it (26.1); regular glass before that.
+private struct ClearGlassButtonStyle: ViewModifier {
+    func body(content: Content) -> some View {
+        if #available(iOS 26.1, *) {
+            content.buttonStyle(GlassButtonStyle(.clear))
+        } else {
+            content.buttonStyle(.glass)
         }
     }
 }
