@@ -17,6 +17,54 @@ protocol KeypadTarget {
 extension Scorepad: KeypadTarget {}
 extension TallyPad: KeypadTarget {}
 
+/// A running Match with its keypad docked under it, or beside it in landscape.
+/// The keypad slides up from the bottom edge, or in from the trailing edge, as
+/// it shows, and back out as it is put away, while the Match stretches or
+/// shrinks to meet it. A plain fade under Reduce Motion.
+struct KeypadDock<Content: View, Keypad: View>: View {
+    let isShowingKeypad: Bool
+    @ViewBuilder let content: Content
+    @ViewBuilder let keypad: Keypad
+    @Environment(\.verticalSizeClass) private var verticalSizeClass
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+    var body: some View {
+        Group {
+            if verticalSizeClass == .compact {
+                HStack(spacing: 0) {
+                    content
+                    if isShowingKeypad {
+                        HStack(spacing: 0) {
+                            Divider()
+                            keypad
+                                .frame(width: 280)
+                        }
+                        .transition(transition(from: .trailing))
+                    }
+                }
+            } else {
+                VStack(spacing: 0) {
+                    content
+                    if isShowingKeypad {
+                        VStack(spacing: 0) {
+                            Divider()
+                            keypad
+                        }
+                        .transition(transition(from: .bottom))
+                    }
+                }
+            }
+        }
+        // No bounce: overshooting would lift the keypad off the edge it slides from.
+        .animation(reduceMotion ? .easeInOut(duration: 0.2) : .smooth(duration: 0.35), value: isShowingKeypad)
+    }
+
+    /// Faded as it slides, so no sliver of it lingers over the home indicator.
+    private func transition(from edge: Edge) -> AnyTransition {
+        reduceMotion ? .opacity : .move(edge: edge).combined(with: .opacity)
+    }
+}
+
 /// The keypad Override — digits, sign and delete — with the Game's Quick scores
 /// above it and −1 / +1 beside it, all aimed at the selected Score.
 struct KeypadView<Target: KeypadTarget>: View {
