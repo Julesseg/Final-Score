@@ -148,14 +148,6 @@ struct GameFormView: View {
             Toggle("Scores below 0", isOn: $draft.allowsNegative)
                 .accessibilityIdentifier("negativeToggle")
             if draft.structure == .rounds {
-                Toggle(
-                    draft.teamSize > 1 ? "One Team scores each Round" : "One Player scores each Round",
-                    isOn: Binding(
-                        get: { draft.scorers == .oneTeamPerRound },
-                        set: { draft.scorers = $0 ? .oneTeamPerRound : .everyone }
-                    )
-                )
-                .accessibilityIdentifier("oneScorerToggle")
                 Toggle("Track the Dealer", isOn: $draft.tracksDealer)
                     .accessibilityIdentifier("dealerToggle")
             }

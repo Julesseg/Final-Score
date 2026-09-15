@@ -114,7 +114,7 @@ struct GameDraftTests {
 
     // MARK: Structure
 
-    @Test func aTallyHasNoDealerNoRoundCountAndEveryoneScores() {
+    @Test func aTallyHasNoDealerAndNoRoundCount() {
         var draft = GameDraft(game: .coinche)
         draft.endCondition = .roundCount(10)
 
@@ -122,7 +122,6 @@ struct GameDraftTests {
 
         let game = draft.game
         #expect(!game.tracksDealer, "A Tally has no Rounds to deal")
-        #expect(game.scorers == .everyone, "A Tally has no Round for one Team to score")
         #expect(game.endCondition == .none, "A Tally never reaches a Round count")
     }
 
@@ -138,11 +137,9 @@ struct GameDraftTests {
         draft.structure = .tally
 
         draft.tracksDealer = true
-        draft.scorers = .oneTeamPerRound
         draft.endCondition = .roundCount(5)
 
         #expect(!draft.game.tracksDealer)
-        #expect(draft.game.scorers == .everyone)
         #expect(draft.game.endCondition == .none)
     }
 

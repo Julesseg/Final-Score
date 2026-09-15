@@ -1,8 +1,7 @@
 import Foundation
 
 /// A Match open on the scorepad, with the keypad Override aimed at one Team's
-/// Score in one Round. In a Game where only one Team scores each Round, a new
-/// Round first asks which Team scored it, then opens the keypad on that Team.
+/// Score in one Round.
 public struct Scorepad: Sendable {
     /// Where a Score sits on the scorepad.
     public struct Position: Hashable, Sendable {
@@ -18,16 +17,11 @@ public struct Scorepad: Sendable {
     public private(set) var match: Match
     /// The Score the keypad is typing into; nil while the keypad is put away.
     public private(set) var selection: Position?
-    /// The Round waiting to be told which Team scored it, while the keypad is
-    /// put away; nil when nothing is asked. Only ever set in a Game where one
-    /// Team scores per Round.
-    public private(set) var roundAwaitingScoringTeam: Round.ID?
     private var typed = Override()
 
-    /// Opens ready for the Round in play: on the first Team still unscored in
-    /// it, or asking who scored it in a Game where one Team scores per Round —
-    /// or with the keypad away on an ended Match, which is only reopened to
-    /// look at or to correct.
+    /// Opens ready for the Round in play, on the first Team still unscored in
+    /// it — or with the keypad away on an ended Match, which is only reopened
+    /// to look at or to correct.
     public init(match: Match) {
         self.match = match
         if !match.isEnded {
@@ -39,15 +33,8 @@ public struct Scorepad: Sendable {
         typed.text
     }
 
-    /// Opens the keypad on a Score, as an Override: whatever the scorepad was
-    /// asking is dropped. In a Game where one Team scores per Round, a Score
-    /// tapped in a Round nobody has scored yet answers the question anyway:
-    /// its Team takes the Round.
+    /// Opens the keypad on a Score, as an Override.
     public mutating func select(_ position: Position) {
-        roundAwaitingScoringTeam = nil
-        if match.round(position.round)?.scores.isEmpty == true {
-            match.setScoringTeam(position.team, inRound: position.round)
-        }
         selection = position
         typed = Override(points: match.round(position.round)?.points(for: position.team))
     }
@@ -99,10 +86,9 @@ public struct Scorepad: Sendable {
         case done
     }
 
-    /// In a Game where one Team scores per Round, Next never moves along the
-    /// Round: every other Team scores 0.
+    /// What Next does from the selected Team.
     public var nextStep: NextStep {
-        if match.game.scorers == .everyone, teamAfterSelection != nil { return .nextTeam }
+        if teamAfterSelection != nil { return .nextTeam }
         return !match.isEnded && selection?.round == match.rounds.last?.id ? .newRound : .done
     }
 
@@ -121,18 +107,9 @@ public struct Scorepad: Sendable {
         }
     }
 
-    /// Puts the keypad away, or stops asking who scored.
+    /// Puts the keypad away.
     public mutating func deselect() {
         selection = nil
-        roundAwaitingScoringTeam = nil
-    }
-
-    /// Answers which Team scored the Round being asked about: every other Team
-    /// gets 0, and the keypad opens on this Team's Score. Does nothing when
-    /// nothing is asked.
-    public mutating func chooseScoringTeam(_ team: Team.ID) {
-        guard let round = roundAwaitingScoringTeam else { return }
-        select(Position(round: round, team: team))
     }
 
     public mutating func startNewRound() {
@@ -141,12 +118,12 @@ public struct Scorepad: Sendable {
         openRoundInPlay()
     }
 
-    /// Deletes a Round. A keypad on it, or a question about it, moves to the
-    /// Round in play, or goes away if nothing is left to score there or the
-    /// Match is ended; anywhere else it stays put.
+    /// Deletes a Round. A keypad on it moves to the Round in play, or goes away
+    /// if nothing is left to score there or the Match is ended; anywhere else
+    /// it stays put.
     public mutating func deleteRound(_ id: Round.ID) {
         match.deleteRound(id)
-        guard selection?.round == id || roundAwaitingScoringTeam == id else { return }
+        guard selection?.round == id else { return }
         deselect()
         if !match.isEnded {
             openRoundInPlay()
@@ -178,19 +155,11 @@ public struct Scorepad: Sendable {
         match.setScore(typed.points, for: selection.team, inRound: selection.round)
     }
 
-    /// Asks who scored the last Round if nobody has yet, in a Game where one
-    /// Team scores per Round, where a Round anyone scored needs nothing more.
-    /// Otherwise opens the keypad on the first Team still unscored in it.
+    /// Opens the keypad on the first Team still unscored in the last Round.
     private mutating func openRoundInPlay() {
-        guard let round = match.rounds.last else { return }
-        switch match.game.scorers {
-        case .oneTeamPerRound:
-            if round.scores.isEmpty {
-                roundAwaitingScoringTeam = round.id
-            }
-        case .everyone:
-            guard let team = match.teams.first(where: { round.points(for: $0.id) == nil }) else { return }
-            select(Position(round: round.id, team: team.id))
-        }
+        guard let round = match.rounds.last,
+              let team = match.teams.first(where: { round.points(for: $0.id) == nil })
+        else { return }
+        select(Position(round: round.id, team: team.id))
     }
 }
