@@ -84,6 +84,17 @@ struct ScorepadTests {
         #expect(scorepad.selection == .init(round: match.rounds[1].id, team: match.teams[0].id))
     }
 
+    @Test func startingARoundOnAnEmptyRoundOpensTheNextOnItsFirstTeam() {
+        var scorepad = Scorepad(match: skyjoMatch())
+
+        scorepad.startNewRound()
+
+        let match = scorepad.match
+        #expect(match.rounds.count == 2)
+        #expect(match.rounds[0].scores.map(\.points) == [0, 0, 0])
+        #expect(scorepad.selection == .init(round: match.rounds[1].id, team: match.teams[0].id))
+    }
+
     @Test func selectingAScoredTeamShowsItsScoreAndTypingReplacesIt() {
         var scorepad = Scorepad(match: skyjoMatch())
         scorepad.type(1)

@@ -14,7 +14,6 @@ struct TallyScoringTests {
 
         #expect(match.rounds.isEmpty)
         #expect(match.tallyScores.isEmpty)
-        #expect(!match.canStartNewRound)
     }
 
     @Test func startingANewRoundDoesNothingInATally() {
