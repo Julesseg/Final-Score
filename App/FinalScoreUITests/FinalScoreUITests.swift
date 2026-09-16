@@ -118,7 +118,7 @@ final class FinalScoreUITests: XCTestCase {
         // Five columns overflow a portrait iPhone, so a sideways drag scrolls.
         startMatch("Skyjo", players: ["Ada", "Grace", "Linus", "Marie", "Alan"])
         press("1", "next", "2", "next", "3", "next", "4", "next", "5", "next", "6")
-        app.buttons["hideKeypadButton"].tap()
+        hideKeypad()
 
         app.buttons["score.1.0"].press(forDuration: 1)
         let delete = app.buttons["Delete Round"]
@@ -230,7 +230,7 @@ final class FinalScoreUITests: XCTestCase {
         let outcome = element("outcome")
         XCTAssertTrue(outcome.waitForExistence(timeout: 5))
         XCTAssertTrue(outcome.label.contains("Grace wins"))
-        XCTAssertFalse(app.buttons["key.next"].exists, "Ending puts the keypad away")
+        XCTAssertTrue(app.buttons["key.next"].waitForNonExistence(timeout: 5), "Ending slides the keypad away")
 
         backToList()
 
@@ -821,7 +821,7 @@ final class FinalScoreUITests: XCTestCase {
 
         // Grace's 9 in Round 1 was really a 30. With the keypad up, a small
         // phone only has room for the last Rounds, so put it away to see Round 1.
-        app.buttons["hideKeypadButton"].tap()
+        hideKeypad()
         app.buttons["score.1.1"].tap()
         XCTAssertEqual(app.staticTexts["keypadDisplay"].label, "9")
         press("3", "0")
@@ -1088,7 +1088,7 @@ final class FinalScoreUITests: XCTestCase {
         XCTAssertEqual(app.staticTexts["keypadTitle"].label, "Add to Grace", "Still adding once the first key records the Score")
         attachScreenshot(named: "Tally adding a Score, \(orientationName)")
         press("next")
-        XCTAssertFalse(app.buttons["key.next"].exists, "Done puts the keypad away")
+        XCTAssertTrue(app.buttons["key.next"].waitForNonExistence(timeout: 5), "Done slides the keypad away")
 
         let history = app.buttons["history.4"]
         XCTAssertFalse(history.exists, "The history sits behind a disclosure")

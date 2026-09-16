@@ -24,29 +24,13 @@ struct ScorepadView: View {
     }
 
     var body: some View {
-        Group {
-            if verticalSizeClass == .compact {
-                HStack(spacing: 0) {
-                    VStack(spacing: 0) {
-                        MatchBanner(match: scorepad.match, onEnd: { isConfirmingEnd = true }, onRematch: onRematch)
-                        grid
-                    }
-                    if scorepad.selection != nil {
-                        Divider()
-                        keypad
-                            .frame(width: 280)
-                    }
-                }
-            } else {
-                VStack(spacing: 0) {
-                    MatchBanner(match: scorepad.match, onEnd: { isConfirmingEnd = true }, onRematch: onRematch)
-                    grid
-                    if scorepad.selection != nil {
-                        Divider()
-                        keypad
-                    }
-                }
+        KeypadDock(isShowingKeypad: scorepad.selection != nil) {
+            VStack(spacing: 0) {
+                MatchBanner(match: scorepad.match, onEnd: { isConfirmingEnd = true }, onRematch: onRematch)
+                grid
             }
+        } keypad: {
+            keypad
         }
         .tint(game.accent.color)
         .celebrating(scorepad.match)

@@ -21,29 +21,13 @@ struct TallyView: View {
     }
 
     var body: some View {
-        Group {
-            if isCompact {
-                HStack(spacing: 0) {
-                    VStack(spacing: 0) {
-                        MatchBanner(match: pad.match, onEnd: { isConfirmingEnd = true }, onRematch: onRematch)
-                        board
-                    }
-                    if pad.selection != nil {
-                        Divider()
-                        keypad
-                            .frame(width: 280)
-                    }
-                }
-            } else {
-                VStack(spacing: 0) {
-                    MatchBanner(match: pad.match, onEnd: { isConfirmingEnd = true }, onRematch: onRematch)
-                    board
-                    if pad.selection != nil {
-                        Divider()
-                        keypad
-                    }
-                }
+        KeypadDock(isShowingKeypad: pad.selection != nil) {
+            VStack(spacing: 0) {
+                MatchBanner(match: pad.match, onEnd: { isConfirmingEnd = true }, onRematch: onRematch)
+                board
             }
+        } keypad: {
+            keypad
         }
         .tint(pad.match.game.accent.color)
         .celebrating(pad.match)
