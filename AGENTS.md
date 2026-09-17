@@ -28,7 +28,7 @@ Single-context: one root `CONTEXT.md` plus `docs/adr/`, both created lazily. See
 ### Conventional Commits — commit subjects *and* PR titles
 
 Commit subjects follow [Conventional Commits](https://www.conventionalcommits.org/),
-enforced by a `PreToolUse` hook (`.claude/hooks/validate-commit-msg.py`). **PR
+enforced by a pre-command hook (`.agents/hooks/validate-commit-msg.py`). **PR
 titles must match too.** Title PRs `<type>(<scope>)!: <description>` using the
 same types: `feat`, `fix`, `docs`, `style`, `refactor`, `perf`, `test`, `build`,
 `ci`, `chore`, `revert`.
@@ -58,8 +58,8 @@ You **never** need to run the UI suite locally as a precondition for
 implementing an issue.
 
 Whether the box you are on can run the UI suite at all is **environment-
-specific**, so it is not stated here as a flat fact — a `SessionStart` hook
-(`.claude/hooks/platform-guidance.sh`) reports it per session: cloud/web
+specific**, so it is not stated here as a flat fact. A startup hook
+(`.agents/hooks/platform-guidance.sh`) reports it per session: remote/web
 sessions and local Linux machines have no iOS simulator and cannot build the
 `App/` target or run XCUITest; a developer's Mac has Xcode and *can* run the
 suite locally, though doing so is slow and optional. Follow whatever that hook
