@@ -33,7 +33,7 @@ struct KeypadDock<Content: View, Keypad: View>: View {
         GeometryReader { proxy in
             let usesSidebar = proxy.size.width >= 700
                 || (proxy.size.width >= 600 && proxy.size.height < 500)
-            let compactKeys = proxy.size.height < 720
+            let compactKeys = proxy.size.height < (usesSidebar ? 500 : 720)
             if usesSidebar {
                 HStack(spacing: 0) {
                     content

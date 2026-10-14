@@ -1329,7 +1329,7 @@ final class FinalScoreUITests: XCTestCase {
 
     /// Kept in the result bundle CI uploads, so a layout can be checked by eye.
     private func attachScreenshot(named name: String) {
-        let attachment = XCTAttachment(screenshot: app.screenshot())
+        let attachment = XCTAttachment(screenshot: XCUIScreen.main.screenshot())
         attachment.name = name
         attachment.lifetime = .keepAlways
         add(attachment)
