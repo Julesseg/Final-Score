@@ -24,20 +24,28 @@ extension TallyPad: KeypadTarget {}
 struct KeypadDock<Content: View, Keypad: View>: View {
     let isShowingKeypad: Bool
     @ViewBuilder let content: Content
-    @ViewBuilder let keypad: Keypad
-    @Environment(\.verticalSizeClass) private var verticalSizeClass
+    @ViewBuilder let keypad: (Bool) -> Keypad
+    @ScaledMetric(relativeTo: .body) private var minimumContentHeight: CGFloat = 240
+    @State private var keypadHeight: CGFloat = 0
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
-        Group {
-            if verticalSizeClass == .compact {
+        GeometryReader { proxy in
+            let usesSidebar = proxy.size.width >= 700
+                || (proxy.size.width >= 600 && proxy.size.height < 500)
+            let compactKeys = proxy.size.height < 720
+            if usesSidebar {
                 HStack(spacing: 0) {
                     content
                     if isShowingKeypad {
                         HStack(spacing: 0) {
                             Divider()
-                            keypad
-                                .frame(width: 280)
+                            ScrollView(.vertical) {
+                                keypad(compactKeys)
+                            }
+                            .accessibilityIdentifier("keypadViewport")
+                            .scrollBounceBehavior(.basedOnSize)
+                            .frame(width: compactKeys ? 280 : 360)
                         }
                         .transition(transition(from: .trailing))
                     }
@@ -48,7 +56,20 @@ struct KeypadDock<Content: View, Keypad: View>: View {
                     if isShowingKeypad {
                         VStack(spacing: 0) {
                             Divider()
-                            keypad
+                            ScrollView(.vertical) {
+                                keypad(compactKeys)
+                                    .frame(maxWidth: 440)
+                                    .frame(maxWidth: .infinity)
+                                    .onGeometryChange(for: CGFloat.self) { $0.size.height } action: {
+                                        keypadHeight = $0
+                                    }
+                            }
+                            .accessibilityIdentifier("keypadViewport")
+                            .scrollBounceBehavior(.basedOnSize)
+                            .frame(height: min(
+                                keypadHeight > 0 ? keypadHeight : proxy.size.height / 2,
+                                max(44, proxy.size.height - min(minimumContentHeight, proxy.size.height * 0.6))
+                            ))
                         }
                         .transition(transition(from: .bottom))
                     }
@@ -69,26 +90,22 @@ struct KeypadDock<Content: View, Keypad: View>: View {
 /// above it and −1 / +1 beside it, all aimed at the selected Score.
 struct KeypadView<Target: KeypadTarget>: View {
     @Binding var target: Target
-    /// Whose Score is being typed: "Grace · Round 2".
     let title: String
-    /// The wide key under the digits, and what it does.
     let nextTitle: String
+    var isCompact = false
     let next: () -> Void
-    @Environment(\.verticalSizeClass) private var verticalSizeClass
+    @ScaledMetric(relativeTo: .title2) private var adjustmentWidth: CGFloat = 72
 
-    /// Landscape phones have the height for four rows of keys, or for five
-    /// shorter ones once a row of Quick scores joins them.
     private var keyHeight: CGFloat {
-        guard verticalSizeClass == .compact else { return 52 }
-        return quickScores.isEmpty ? 40 : 32
+        isCompact ? 44 : 52
     }
 
     private var spacing: CGFloat {
-        verticalSizeClass == .compact ? 6 : 8
+        isCompact ? 6 : 8
     }
 
     private var adjustColumnWidth: CGFloat {
-        verticalSizeClass == .compact ? 56 : 72
+        adjustmentWidth
     }
 
     private var quickScores: [Int] {
@@ -101,7 +118,7 @@ struct KeypadView<Target: KeypadTarget>: View {
                 Text(title)
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
-                    .lineLimit(1)
+                    .lineLimit(2)
                     .accessibilityIdentifier("keypadTitle")
                 Spacer()
                 Text(target.keypadText)
@@ -111,7 +128,7 @@ struct KeypadView<Target: KeypadTarget>: View {
                     .labelStyle(.iconOnly)
                     .accessibilityIdentifier("hideKeypadButton")
             }
-            if !quickScores.isEmpty {
+            if !quickScores.isEmpty && !isCompact {
                 quickScoreRow
             }
             HStack(spacing: spacing) {
@@ -144,16 +161,31 @@ struct KeypadView<Target: KeypadTarget>: View {
             }
             // As tall as the digits, which the ±1 column then stretches to fill.
             .fixedSize(horizontal: false, vertical: true)
-            Button(action: next) {
-                Text(nextTitle)
-                    .font(.headline)
-                    .frame(maxWidth: .infinity, minHeight: keyHeight - 8)
+            if isCompact && !quickScores.isEmpty {
+                HStack(spacing: spacing) {
+                    ScrollView(.horizontal) {
+                        quickScoreButtons
+                    }
+                    .scrollIndicators(.hidden)
+                    nextButton.frame(minWidth: 106)
+                }
+            } else {
+                nextButton
             }
-            .buttonStyle(.borderedProminent)
-            .accessibilityIdentifier("key.next")
         }
         .padding(12)
         .background(.bar)
+    }
+
+    private var nextButton: some View {
+        Button(action: next) {
+            Text(nextTitle)
+                .font(.headline)
+                .lineLimit(1)
+                .frame(maxWidth: .infinity, minHeight: keyHeight - 8)
+        }
+        .buttonStyle(.borderedProminent)
+        .accessibilityIdentifier("key.next")
     }
 
     /// The Game's Quick scores in the order it declares them, spread across the
@@ -199,10 +231,14 @@ struct KeypadView<Target: KeypadTarget>: View {
         Button(action: action) {
             label
                 .font(.title2.monospacedDigit())
+                .lineLimit(1)
+                .minimumScaleFactor(0.8)
                 .frame(maxWidth: .infinity, minHeight: keyHeight, maxHeight: fillsHeight ? .infinity : nil)
+                .foregroundStyle(.primary)
+                .background(.secondary.opacity(0.12), in: RoundedRectangle(cornerRadius: 12))
+                .contentShape(Rectangle())
         }
-        .buttonStyle(.bordered)
-        .tint(.secondary)
+        .buttonStyle(.plain)
         .accessibilityIdentifier(identifier)
     }
 }

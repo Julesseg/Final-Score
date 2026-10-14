@@ -6,6 +6,83 @@ import XCTest
 final class FinalScoreUITests: XCTestCase {
     private lazy var app = XCUIApplication()
 
+    func testTarotKeepsTheSelectedScoreVisibleWithTheKeypadOpen() {
+        launch()
+        startMatch("Tarot", players: ["Ada", "Grace", "Linus"])
+        assertSelectedScoreIsVisible("score.1.0")
+        press("next", "next", "next")
+        assertSelectedScoreIsVisible("score.2.0")
+        attachScreenshot(named: "Selected Tarot score and keypad, portrait")
+        XCUIDevice.shared.orientation = .landscapeLeft
+        assertSelectedScoreIsVisible("score.2.0")
+        attachScreenshot(named: "Selected Tarot score and keypad, landscape")
+    }
+
+    func testLargeTextKeepsTheSelectedScoreAndKeypadUsable() {
+        launch()
+        startMatch("Tarot", players: ["Ada", "Grace", "Linus"])
+        app.terminate()
+        app.launchArguments = ["-UIPreferredContentSizeCategoryName", "UICTContentSizeCategoryAccessibilityXXXL"]
+        app.launch()
+        XCTAssertTrue(app.buttons["matchRow"].firstMatch.waitForExistence(timeout: 10))
+        app.buttons["matchRow"].firstMatch.tap()
+        assertSelectedScoreIsVisible("score.1.0")
+        let keypad = element("keypadViewport")
+        let digit = app.buttons["key.1"]
+        for _ in 0..<5 {
+            if digit.exists && digit.isHittable { break }
+            keypad.swipeUp()
+        }
+        digit.tap()
+        XCTAssertEqual(app.buttons["score.1.0"].value as? String, "1")
+        assertSelectedScoreIsVisible("score.1.0")
+        attachScreenshot(named: "Accessible score remains visible while keypad scrolls")
+    }
+
+    func testOpeningTheKeypadKeepsAnOlderRoundVisible() {
+        launch()
+        startMatch("Tarot", players: ["Ada", "Grace", "Linus"])
+        for _ in 0..<30 { press("next") }
+        app.buttons["hideKeypadButton"].tap()
+        let rounds = element("roundsViewport")
+        let first = app.buttons["score.1.0"]
+        for _ in 0..<8 {
+            if first.exists && first.isHittable { break }
+            rounds.swipeDown()
+        }
+        first.tap()
+        assertSelectedScoreIsVisible("score.1.0")
+        attachScreenshot(named: "Older Round remains visible after opening keypad")
+    }
+
+    func testNextFollowsTeamsAcrossAHorizontalScorepad() {
+        launch()
+        startMatch("Skyjo", players: ["Ada", "Alan", "Albert", "Alice", "Alicia", "Alexandria Montgomery", "Alexandra Martin", "Grace"])
+        for index in 0..<8 {
+            assertSelectedScoreIsVisible("score.1.\(index)")
+            if index < 7 { press("next") }
+        }
+        attachScreenshot(named: "Selected eighth Team follows horizontally")
+        app.buttons["newRoundButton"].tap()
+        assertSelectedScoreIsVisible("score.2.0")
+        attachScreenshot(named: "Eight-player plus row opens next Round")
+    }
+
+    private func assertSelectedScoreIsVisible(_ identifier: String) {
+        let cell = app.buttons[identifier]
+        let rounds = element("roundsViewport")
+        let grid = element("scorepadViewport")
+        let visible = NSPredicate { _, _ in
+            guard cell.exists, rounds.exists, grid.exists else { return false }
+            let viewport = rounds.frame.intersection(grid.frame).intersection(self.app.frame)
+            return !viewport.isEmpty && viewport.insetBy(dx: -1, dy: -1).contains(cell.frame)
+                && cell.frame.height >= 44 && cell.isHittable
+        }
+        let expectation = XCTNSPredicateExpectation(predicate: visible, object: cell)
+        XCTAssertEqual(XCTWaiter.wait(for: [expectation], timeout: 5), .completed, identifier)
+        XCTAssertTrue(cell.isSelected)
+    }
+
     func testScoringTwoSkyjoRoundsTotalsEachPlayer() throws {
         launch()
         startMatch("Skyjo", players: ["Ada", "Grace"])
