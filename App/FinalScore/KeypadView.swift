@@ -31,8 +31,7 @@ struct KeypadDock<Content: View, Keypad: View>: View {
 
     var body: some View {
         GeometryReader { proxy in
-            let usesSidebar = proxy.size.width >= 700
-                || (proxy.size.width >= 600 && proxy.size.height < 500)
+            let usesSidebar = proxy.size.width >= 600 && proxy.size.width > proxy.size.height
             let compactKeys = proxy.size.height < (usesSidebar ? 500 : 720)
             if usesSidebar {
                 HStack(spacing: 0) {
@@ -95,6 +94,7 @@ struct KeypadView<Target: KeypadTarget>: View {
     var isCompact = false
     let next: () -> Void
     @ScaledMetric(relativeTo: .title2) private var adjustmentWidth: CGFloat = 72
+    @ScaledMetric(relativeTo: .headline) private var quickScoreWidth: CGFloat = 44
 
     private var keyHeight: CGFloat {
         isCompact ? 44 : 52
@@ -162,13 +162,24 @@ struct KeypadView<Target: KeypadTarget>: View {
             // As tall as the digits, which the ±1 column then stretches to fill.
             .fixedSize(horizontal: false, vertical: true)
             if isCompact && !quickScores.isEmpty {
-                HStack(spacing: spacing) {
-                    ScrollView(.horizontal) {
-                        quickScoreButtons
+                ViewThatFits(in: .horizontal) {
+                    HStack(spacing: spacing) {
+                        quickScoreButtons.fixedSize(horizontal: true, vertical: false)
+                        nextButton.fixedSize(horizontal: true, vertical: false)
                     }
-                    .scrollIndicators(.hidden)
-                    nextButton.frame(minWidth: 106)
+                    HStack(spacing: spacing) {
+                        quickScoreButtons.fixedSize(horizontal: true, vertical: false)
+                        compactNextButton
+                    }
+                    HStack(spacing: spacing) {
+                        ScrollView(.horizontal) {
+                            quickScoreButtons
+                        }
+                        .scrollIndicators(.hidden)
+                        compactNextButton
+                    }
                 }
+                .frame(maxWidth: .infinity)
             } else {
                 nextButton
             }
@@ -186,6 +197,27 @@ struct KeypadView<Target: KeypadTarget>: View {
         }
         .buttonStyle(.borderedProminent)
         .accessibilityIdentifier("key.next")
+    }
+
+    private var compactNextButton: some View {
+        Button(action: next) {
+            Image(systemName: nextSymbol)
+                .font(.headline)
+                .frame(width: keyHeight, height: keyHeight)
+                .foregroundStyle(.white)
+                .background(.tint, in: Capsule())
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(nextTitle)
+        .accessibilityIdentifier("key.next")
+    }
+
+    private var nextSymbol: String {
+        switch nextTitle {
+        case "Done": "checkmark"
+        case "New Round": "plus"
+        default: "arrow.right"
+        }
     }
 
     /// The Game's Quick scores in the order it declares them, spread across the
@@ -208,8 +240,10 @@ struct KeypadView<Target: KeypadTarget>: View {
                 Button { target.enterQuickScore(points) } label: {
                     Text("\(points)")
                         .font(.headline.monospacedDigit())
+                        .lineLimit(1)
+                        .fixedSize(horizontal: true, vertical: false)
                         .padding(.horizontal, 6)
-                        .frame(minWidth: 44, maxWidth: .infinity, minHeight: keyHeight)
+                        .frame(minWidth: quickScoreWidth, maxWidth: .infinity, minHeight: keyHeight)
                         .background(.tint.opacity(0.15), in: Capsule())
                 }
                 .buttonStyle(.borderless)

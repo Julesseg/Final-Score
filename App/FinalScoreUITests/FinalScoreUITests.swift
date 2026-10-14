@@ -12,10 +12,43 @@ final class FinalScoreUITests: XCTestCase {
         assertSelectedScoreIsVisible("score.1.0")
         press("next", "next", "next")
         assertSelectedScoreIsVisible("score.2.0")
+        assertKeypadPlacement(usesSidebar: false)
+        assertTarotQuickScoresAreVisible()
         attachScreenshot(named: "Selected Tarot score and keypad, portrait")
         XCUIDevice.shared.orientation = .landscapeLeft
         assertSelectedScoreIsVisible("score.2.0")
+        assertKeypadPlacement(usesSidebar: app.frame.width >= 600)
+        assertTarotQuickScoresAreVisible()
         attachScreenshot(named: "Selected Tarot score and keypad, landscape")
+        press("1")
+        hideKeypad()
+        XCTAssertEqual(app.buttons["score.2.0"].value as? String, "1")
+        attachScreenshot(named: "Tarot scorepad after hiding keypad, landscape")
+    }
+
+    private func assertKeypadPlacement(usesSidebar: Bool) {
+        let keypad = element("keypadViewport")
+        let grid = element("scorepadViewport")
+        let placed = NSPredicate { _, _ in
+            guard keypad.exists, grid.exists else { return false }
+            return usesSidebar ? keypad.frame.minX >= grid.frame.maxX - 1
+                : keypad.frame.minY >= grid.frame.maxY - 1
+        }
+        XCTAssertEqual(XCTWaiter.wait(for: [XCTNSPredicateExpectation(predicate: placed, object: keypad)], timeout: 5), .completed)
+    }
+
+    private func assertTarotQuickScoresAreVisible() {
+        let keypad = element("keypadViewport")
+        for identifier in (0..<4).map({ "quickScore.\($0)" }) + ["key.next"] {
+            let button = app.buttons[identifier]
+            let visible = NSPredicate { _, _ in
+                guard button.exists, keypad.exists else { return false }
+                let viewport = keypad.frame.intersection(self.app.frame)
+                return viewport.insetBy(dx: -1, dy: -1).contains(button.frame)
+                    && button.frame.width >= 44 && button.frame.height >= 44 && button.isHittable
+            }
+            XCTAssertEqual(XCTWaiter.wait(for: [XCTNSPredicateExpectation(predicate: visible, object: button)], timeout: 5), .completed, identifier)
+        }
     }
 
     func testLargeTextKeepsTheSelectedScoreAndKeypadUsable() {
@@ -27,6 +60,7 @@ final class FinalScoreUITests: XCTestCase {
         XCTAssertTrue(app.buttons["matchRow"].firstMatch.waitForExistence(timeout: 10))
         app.buttons["matchRow"].firstMatch.tap()
         assertSelectedScoreIsVisible("score.1.0")
+        attachScreenshot(named: "Accessible score and keypad before entry")
         let keypad = element("keypadViewport")
         let digit = app.buttons["key.1"]
         for _ in 0..<5 {
@@ -1215,6 +1249,7 @@ final class FinalScoreUITests: XCTestCase {
         let quickScores = (0..<4).map { app.buttons["quickScore.\($0)"] }
         XCTAssertEqual(quickScores.map(\.label), ["25", "50", "100", "150"])
         XCTAssertFalse(app.buttons["quickScore.4"].exists)
+        assertTarotQuickScoresAreVisible()
 
         // Ada: a Quick score, nudged up.
         quickScores[1].tap()
@@ -1224,6 +1259,7 @@ final class FinalScoreUITests: XCTestCase {
         // Grace: a Quick score typed over — the keypad ignores Quick scores.
         quickScores[0].tap()
         press("3", "7", "next")
+        assertTarotQuickScoresAreVisible()
         // Linus: nothing yet, then −1.
         press("minusOne")
 
