@@ -13,6 +13,7 @@ final class FinalScoreUITests: XCTestCase {
         press("next", "next", "next")
         assertSelectedScoreIsVisible("score.2.0")
         assertKeypadPlacement(usesSidebar: false)
+        assertKeypadFillsItsWidth()
         assertTarotQuickScoresAreVisible()
         attachScreenshot(named: "Selected Tarot score and keypad, portrait")
         XCUIDevice.shared.orientation = .landscapeLeft
@@ -35,6 +36,18 @@ final class FinalScoreUITests: XCTestCase {
                 : keypad.frame.minY >= grid.frame.maxY - 1
         }
         XCTAssertEqual(XCTWaiter.wait(for: [XCTNSPredicateExpectation(predicate: placed, object: keypad)], timeout: 5), .completed)
+    }
+
+    private func assertKeypadFillsItsWidth() {
+        let keypad = element("keypadViewport")
+        let firstKey = app.buttons["key.1"]
+        let adjustmentKey = app.buttons["key.plusOne"]
+        let fillsWidth = NSPredicate { _, _ in
+            guard keypad.exists, firstKey.exists, adjustmentKey.exists else { return false }
+            return abs(firstKey.frame.minX - keypad.frame.minX - 12) <= 1
+                && abs(keypad.frame.maxX - adjustmentKey.frame.maxX - 12) <= 1
+        }
+        XCTAssertEqual(XCTWaiter.wait(for: [XCTNSPredicateExpectation(predicate: fillsWidth, object: keypad)], timeout: 5), .completed)
     }
 
     private func assertTarotQuickScoresAreVisible() {
@@ -60,6 +73,7 @@ final class FinalScoreUITests: XCTestCase {
         XCTAssertTrue(app.buttons["matchRow"].firstMatch.waitForExistence(timeout: 10))
         app.buttons["matchRow"].firstMatch.tap()
         assertSelectedScoreIsVisible("score.1.0")
+        assertKeypadFillsItsWidth()
         attachScreenshot(named: "Accessible score and keypad before entry")
         let keypad = element("keypadViewport")
         let digit = app.buttons["key.1"]

@@ -57,7 +57,6 @@ struct KeypadDock<Content: View, Keypad: View>: View {
                             Divider()
                             ScrollView(.vertical) {
                                 keypad(compactKeys)
-                                    .frame(maxWidth: 440)
                                     .frame(maxWidth: .infinity)
                                     .onGeometryChange(for: CGFloat.self) { $0.size.height } action: {
                                         keypadHeight = $0
@@ -95,6 +94,7 @@ struct KeypadView<Target: KeypadTarget>: View {
     let next: () -> Void
     @ScaledMetric(relativeTo: .title2) private var adjustmentWidth: CGFloat = 72
     @ScaledMetric(relativeTo: .headline) private var quickScoreWidth: CGFloat = 44
+    @State private var keypadWidth: CGFloat = 0
 
     private var keyHeight: CGFloat {
         isCompact ? 44 : 52
@@ -105,7 +105,7 @@ struct KeypadView<Target: KeypadTarget>: View {
     }
 
     private var adjustColumnWidth: CGFloat {
-        adjustmentWidth
+        keypadWidth >= 600 ? max(adjustmentWidth, (keypadWidth - 24 - spacing * 3) / 4) : adjustmentWidth
     }
 
     private var quickScores: [Int] {
@@ -185,6 +185,9 @@ struct KeypadView<Target: KeypadTarget>: View {
             }
         }
         .padding(12)
+        .onGeometryChange(for: CGFloat.self) { $0.size.width } action: {
+            keypadWidth = $0
+        }
         .background(.bar)
     }
 
