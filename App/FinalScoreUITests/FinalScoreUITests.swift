@@ -896,12 +896,19 @@ final class FinalScoreUITests: XCTestCase {
         XCTAssertEqual(total(1), "16")
         XCTAssertTrue(app.images["leader.1"].exists, "Lowest Total leads in Skyjo")
 
-        // Grace's 9 in Round 1 was really a 30. With the keypad up, a small
-        // phone only has room for the last Rounds, so put it away to see Round 1.
         hideKeypad()
-        app.buttons["score.1.1"].tap()
+        let olderScore = app.buttons["score.1.1"]
+        let rounds = element("roundsViewport")
+        for _ in 0..<4 {
+            if olderScore.exists && olderScore.isHittable { break }
+            rounds.swipeDown()
+        }
+        XCTAssertTrue(olderScore.isHittable)
+        olderScore.tap()
+        assertSelectedScoreIsVisible("score.1.1")
         XCTAssertEqual(app.staticTexts["keypadDisplay"].label, "9")
         press("3", "0")
+        assertSelectedScoreIsVisible("score.1.1")
 
         XCTAssertEqual(total(1), "37")
         XCTAssertTrue(app.images["leader.0"].exists, "The correction hands Ada the lead")
