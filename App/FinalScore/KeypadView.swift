@@ -41,6 +41,7 @@ struct KeypadDock<Content: View, Keypad: View>: View {
                             Divider()
                             ScrollView(.vertical) {
                                 keypad(compactKeys)
+                                    .frame(minHeight: proxy.size.height)
                             }
                             .accessibilityIdentifier("keypadViewport")
                             .scrollBounceBehavior(.basedOnSize)

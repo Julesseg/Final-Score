@@ -19,6 +19,7 @@ final class FinalScoreUITests: XCTestCase {
         XCUIDevice.shared.orientation = .landscapeLeft
         assertSelectedScoreIsVisible("score.2.0")
         assertKeypadPlacement(usesSidebar: app.frame.width >= 600)
+        if app.frame.width >= 600 { assertKeypadIsCenteredVertically() }
         assertTarotQuickScoresAreVisible()
         attachScreenshot(named: "Selected Tarot score and keypad, landscape")
         press("1")
@@ -50,6 +51,21 @@ final class FinalScoreUITests: XCTestCase {
         XCTAssertEqual(XCTWaiter.wait(for: [XCTNSPredicateExpectation(predicate: fillsWidth, object: keypad)], timeout: 5), .completed)
     }
 
+    private func assertKeypadIsCenteredVertically() {
+        let header = [element("keypadTitle"), element("keypadDisplay"), app.buttons["hideKeypadButton"]]
+        let next = app.buttons["key.next"]
+        let teamName = element("teamName.0")
+        let total = element("total.0")
+        let centered = NSPredicate { _, _ in
+            guard next.exists, teamName.exists, total.exists, header.allSatisfy(\.exists) else { return false }
+            let top = header.map(\.frame.minY).min()!
+            let bottom = next.frame.maxY
+            let gridCenter = (teamName.frame.minY + total.frame.maxY) / 2
+            return abs((top + bottom) / 2 - gridCenter) <= 4
+        }
+        XCTAssertEqual(XCTWaiter.wait(for: [XCTNSPredicateExpectation(predicate: centered, object: next)], timeout: 5), .completed)
+    }
+
     private func assertTarotQuickScoresAreVisible() {
         let keypad = element("keypadViewport")
         for identifier in (0..<4).map({ "quickScore.\($0)" }) + ["key.next"] {
@@ -73,7 +89,7 @@ final class FinalScoreUITests: XCTestCase {
         XCTAssertTrue(app.buttons["matchRow"].firstMatch.waitForExistence(timeout: 10))
         app.buttons["matchRow"].firstMatch.tap()
         assertSelectedScoreIsVisible("score.1.0")
-        assertKeypadFillsItsWidth()
+        if app.frame.width >= 600 { assertKeypadFillsItsWidth() }
         attachScreenshot(named: "Accessible score and keypad before entry")
         let keypad = element("keypadViewport")
         let digit = app.buttons["key.1"]
@@ -85,6 +101,15 @@ final class FinalScoreUITests: XCTestCase {
         XCTAssertEqual(app.buttons["score.1.0"].value as? String, "1")
         assertSelectedScoreIsVisible("score.1.0")
         attachScreenshot(named: "Accessible score remains visible while keypad scrolls")
+        XCUIDevice.shared.orientation = .landscapeLeft
+        assertSelectedScoreIsVisible("score.1.0")
+        for _ in 0..<8 {
+            if app.buttons["key.next"].isHittable { break }
+            keypad.swipeUp()
+        }
+        app.buttons["key.next"].tap()
+        assertSelectedScoreIsVisible("score.1.1")
+        attachScreenshot(named: "Accessible landscape keypad after advancing")
     }
 
     func testOpeningTheKeypadKeepsAnOlderRoundVisible() {
