@@ -16,6 +16,9 @@ struct ScorepadView: View {
     @State private var scorepad: Scorepad
     @State private var isConfirmingEnd = false
     @Environment(\.verticalSizeClass) private var verticalSizeClass
+    @ScaledMetric(relativeTo: .headline) private var teamColumnWidth: CGFloat = 88
+    @State private var roundsViewportHeight: CGFloat = 0
+    @State private var horizontalOffset: CGFloat = 0
 
     init(match: Binding<Match>, onRematch: @escaping () -> Void) {
         _match = match
@@ -29,8 +32,8 @@ struct ScorepadView: View {
                 MatchBanner(match: scorepad.match, onEnd: { isConfirmingEnd = true }, onRematch: onRematch)
                 grid
             }
-        } keypad: {
-            keypad
+        } keypad: { isCompact in
+            keypad(isCompact: isCompact)
         }
         .tint(game.accent.color)
         .celebrating(scorepad.match)
@@ -71,8 +74,8 @@ struct ScorepadView: View {
 
     // MARK: Keypad
 
-    private var keypad: some View {
-        KeypadView(target: $scorepad, title: keypadTitle, nextTitle: nextTitle) { scorepad.next() }
+    private func keypad(isCompact: Bool) -> some View {
+        KeypadView(target: $scorepad, title: keypadTitle, nextTitle: nextTitle, isCompact: isCompact) { scorepad.next() }
     }
 
     /// "Grace · Round 2"
@@ -95,55 +98,64 @@ struct ScorepadView: View {
     // MARK: Grid
 
     private static let roundColumnWidth: CGFloat = 44
-    private static let minimumTeamColumnWidth: CGFloat = 76
+    private var abbreviatedNames: [Team.ID: String] { TeamLabels.abbreviations(for: teams) }
+
+    private struct ScrollTarget: Hashable {
+        let selection: Scorepad.Position?
+        let width: CGFloat
+        let height: CGFloat
+    }
 
     private var grid: some View {
         GeometryReader { proxy in
             let columnWidth = max(
-                Self.minimumTeamColumnWidth,
+                max(teamColumnWidth, CGFloat(abbreviatedNames.values.map(\.count).max() ?? 1) * teamColumnWidth / 6 + 16),
                 (proxy.size.width - Self.roundColumnWidth) / CGFloat(max(teams.count, 1))
             )
             let contentWidth = Self.roundColumnWidth + columnWidth * CGFloat(teams.count)
-            ScrollView(.horizontal) {
-                VStack(spacing: 0) {
-                    header(columnWidth: columnWidth)
-                    Divider()
-                    ScrollViewReader { scroller in
-                        List {
-                            ForEach(Array(scorepad.match.rounds.enumerated()), id: \.element.id) { index, round in
-                                row(round, number: index + 1, columnWidth: columnWidth)
-                                    .id(round.id)
-                            }
-                            if !scorepad.match.isEnded {
-                                newRoundRow(visibleWidth: proxy.size.width)
-                                    .id(Self.newRoundRowID)
-                            }
-                        }
-                        .listStyle(.plain)
-                        // Keeps the Round being typed in view once the keypad
-                        // has taken its room, which on a small phone leaves the
-                        // grid only a couple of rows: the Round in play down to
-                        // the + row under it, an earlier one just into view.
-                        .onChange(of: scorepad.selection?.round) { _, round in
-                            guard let round else { return }
-                            let isInPlay = round == scorepad.match.rounds.last?.id && !scorepad.match.isEnded
-                            DispatchQueue.main.async {
-                                withAnimation {
-                                    if isInPlay {
-                                        scroller.scrollTo(Self.newRoundRowID, anchor: .bottom)
-                                    } else {
-                                        scroller.scrollTo(round)
-                                    }
+            ScrollViewReader { horizontalScroller in
+                ScrollView(.horizontal) {
+                    VStack(spacing: 0) {
+                        header(columnWidth: columnWidth)
+                        Divider()
+                        ScrollViewReader { scroller in
+                            List {
+                                ForEach(Array(scorepad.match.rounds.enumerated()), id: \.element.id) { index, round in
+                                    row(round, number: index + 1, columnWidth: columnWidth)
+                                        .id(round.id)
+                                }
+                                if !scorepad.match.isEnded {
+                                    newRoundRow(visibleWidth: proxy.size.width)
+                                        .id(Self.newRoundRowID)
                                 }
                             }
+                            .listStyle(.plain)
+                            .accessibilityIdentifier("roundsViewport")
+                            .onGeometryChange(for: CGFloat.self) { $0.size.height } action: {
+                                roundsViewportHeight = $0
+                            }
+                            .task(id: ScrollTarget(selection: scorepad.selection, width: columnWidth, height: roundsViewportHeight)) {
+                                await Task.yield()
+                                guard !Task.isCancelled, let selection = scorepad.selection else { return }
+                                scroller.scrollTo(selection.round, anchor: .center)
+                            }
                         }
+                        Divider()
+                        totals(columnWidth: columnWidth)
                     }
-                    Divider()
-                    totals(columnWidth: columnWidth)
+                    .frame(width: max(contentWidth, proxy.size.width), height: proxy.size.height)
                 }
-                .frame(width: max(contentWidth, proxy.size.width), height: proxy.size.height)
+                .accessibilityIdentifier("scorepadViewport")
+                .scrollBounceBehavior(.basedOnSize, axes: .horizontal)
+                .onScrollGeometryChange(for: CGFloat.self) { $0.contentOffset.x } action: { _, offset in
+                    horizontalOffset = offset
+                }
+                .task(id: ScrollTarget(selection: scorepad.selection, width: proxy.size.width, height: proxy.size.height)) {
+                    await Task.yield()
+                    guard !Task.isCancelled, let selection = scorepad.selection else { return }
+                    horizontalScroller.scrollTo(selection.team, anchor: .center)
+                }
             }
-            .scrollBounceBehavior(.basedOnSize, axes: .horizontal)
         }
     }
 
@@ -153,14 +165,21 @@ struct ScorepadView: View {
                 .foregroundStyle(.secondary)
                 .frame(width: Self.roundColumnWidth)
             ForEach(Array(teams.enumerated()), id: \.element.id) { index, team in
-                Text(team.name)
-                    .font(.headline)
-                    .foregroundStyle(scorepad.match.style(of: team.id))
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.7)
-                    .padding(.horizontal, 4)
-                    .frame(width: columnWidth)
-                    .accessibilityIdentifier("teamName.\(index)")
+                ViewThatFits(in: .horizontal) {
+                    Text(team.name)
+                        .fixedSize(horizontal: true, vertical: false)
+                        .accessibilityLabel(team.name)
+                        .accessibilityIdentifier("teamName.\(index)")
+                    Text(abbreviatedNames[team.id] ?? team.name)
+                        .fixedSize(horizontal: true, vertical: false)
+                        .accessibilityLabel(team.name)
+                        .accessibilityIdentifier("teamName.\(index)")
+                }
+                .font(.headline)
+                .foregroundStyle(scorepad.match.style(of: team.id))
+                .padding(.horizontal, 4)
+                .frame(width: columnWidth)
+                .id(team.id)
             }
         }
         .padding(.vertical, 10)
@@ -205,6 +224,7 @@ struct ScorepadView: View {
                 .font(.title3.weight(.semibold))
                 .foregroundStyle(.tint)
                 .frame(width: max(visibleWidth - 6, 0), height: 44)
+                .offset(x: horizontalOffset)
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .background {
                     RoundedRectangle(cornerRadius: 8).fill(.tint.opacity(0.05))
@@ -264,6 +284,7 @@ struct ScorepadView: View {
         .accessibilityIdentifier("score.\(roundNumber).\(teamIndex)")
         .accessibilityLabel("\(team.name), Round \(roundNumber)")
         .accessibilityValue(points.map(String.init) ?? "Not scored")
+        .accessibilityAddTraits(isSelected ? .isSelected : [])
         .overlay(alignment: .topLeading) {
             if let dealer = team.players.first(where: { $0.id == round.dealer }) {
                 dealerBadge(dealer, in: round, roundNumber: roundNumber)

@@ -26,8 +26,8 @@ struct TallyView: View {
                 MatchBanner(match: pad.match, onEnd: { isConfirmingEnd = true }, onRematch: onRematch)
                 board
             }
-        } keypad: {
-            keypad
+        } keypad: { isCompact in
+            keypad(isCompact: isCompact)
         }
         .tint(pad.match.game.accent.color)
         .celebrating(pad.match)
@@ -240,11 +240,12 @@ struct TallyView: View {
 
     // MARK: Keypad
 
-    private var keypad: some View {
+    private func keypad(isCompact: Bool) -> some View {
         KeypadView(
             target: $pad,
             title: keypadTitle,
-            nextTitle: "Done"
+            nextTitle: "Done",
+            isCompact: isCompact
         ) { pad.deselect() }
     }
 
