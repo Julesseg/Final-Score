@@ -31,22 +31,21 @@ struct KeypadDock<Content: View, Keypad: View>: View {
 
     var body: some View {
         GeometryReader { proxy in
-            let usesSidebar = proxy.size.width >= 600 && proxy.size.width > proxy.size.height
+            let usesSidebar = proxy.size.width >= 520 && proxy.size.width > proxy.size.height
             let compactKeys = proxy.size.height < (usesSidebar ? 500 : 720)
             if usesSidebar {
                 HStack(spacing: 0) {
                     content
                     if isShowingKeypad {
-                        HStack(spacing: 0) {
-                            Divider()
-                            ScrollView(.vertical) {
-                                keypad(compactKeys)
-                                    .frame(minHeight: proxy.size.height)
-                            }
-                            .accessibilityIdentifier("keypadViewport")
-                            .scrollBounceBehavior(.basedOnSize)
-                            .frame(width: compactKeys ? 280 : 360)
+                        ScrollView(.vertical) {
+                            keypad(compactKeys)
+                                .clipShape(RoundedRectangle(cornerRadius: 32, style: .continuous))
+                                .padding(.horizontal, 12)
+                                .frame(minHeight: proxy.size.height)
                         }
+                        .accessibilityIdentifier("keypadViewport")
+                        .scrollBounceBehavior(.basedOnSize)
+                        .frame(width: compactKeys ? 304 : 384)
                         .transition(transition(from: .trailing))
                     }
                 }

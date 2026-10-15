@@ -28,6 +28,38 @@ final class FinalScoreUITests: XCTestCase {
         attachScreenshot(named: "Tarot scorepad after hiding keypad, landscape")
     }
 
+    func testLandscapeKeepsAllKeypadControlsVisibleWhenReopened() {
+        launch()
+        startMatch("Tarot", players: ["Ada", "Grace", "Linus"])
+        XCUIDevice.shared.orientation = .landscapeLeft
+        assertSelectedScoreIsVisible("score.1.0")
+        assertAllKeypadKeysAreVisible()
+        attachScreenshot(named: "All landscape keypad controls fit")
+        press("1")
+        hideKeypad()
+        app.buttons["score.1.0"].tap()
+        assertSelectedScoreIsVisible("score.1.0")
+        assertAllKeypadKeysAreVisible()
+        press("next")
+        assertSelectedScoreIsVisible("score.1.1")
+        attachScreenshot(named: "Landscape keypad reopens and advances")
+    }
+
+    private func assertAllKeypadKeysAreVisible() {
+        let keypad = element("keypadViewport")
+        let identifiers = (0...9).map { "key.\($0)" }
+            + ["key.sign", "key.delete", "key.plusOne", "key.minusOne", "key.next"]
+        for identifier in identifiers {
+            let button = app.buttons[identifier]
+            let visible = NSPredicate { _, _ in
+                guard button.exists, keypad.exists else { return false }
+                return keypad.frame.intersection(self.app.frame).insetBy(dx: -1, dy: -1).contains(button.frame)
+                    && button.isHittable && button.frame.width >= 44 && button.frame.height >= 44
+            }
+            XCTAssertEqual(XCTWaiter.wait(for: [XCTNSPredicateExpectation(predicate: visible, object: button)], timeout: 5), .completed, identifier)
+        }
+    }
+
     private func assertKeypadPlacement(usesSidebar: Bool) {
         let keypad = element("keypadViewport")
         let grid = element("scorepadViewport")
