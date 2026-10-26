@@ -1,0 +1,32 @@
+[
+  {
+    "pr": 47,
+    "title": "feat(app): add the Poolside tally icon",
+    "sha": "c759cfa",
+    "time": "2026-10-26T22:24:12.049Z"
+  },
+  {
+    "pr": 46,
+    "title": "fix(app): adapt scoring layouts to iPad and short screens",
+    "sha": "470e41c",
+    "time": "2026-10-15T07:47:52.029Z"
+  },
+  {
+    "pr": 45,
+    "title": "chore: make agent configuration client-neutral",
+    "sha": "918013c",
+    "time": "2026-09-17T20:17:56.994Z"
+  },
+  {
+    "pr": 41,
+    "title": "feat(app): New Round is a + row in the grid, always available",
+    "sha": "e4a138b",
+    "time": "2026-09-15T20:27:33.336Z"
+  },
+  {
+    "pr": 44,
+    "title": "feat(app): slide the keypad in and out",
+    "sha": "7c29593",
+    "time": "2026-09-15T15:57:10.885Z"
+  }
+]
