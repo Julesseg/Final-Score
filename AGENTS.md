@@ -7,8 +7,8 @@
 ### Auto-dispatch of unblocked issues
 
 When an issue closes as completed, `unblock-dispatch.yml` finds `ready-for-agent`
-issues whose `## Blocked by` list is now fully closed and spawns a Paseo agent
-session for each on the self-hosted Mac runner (capped, guarded by the
+issues whose `## Blocked by` list is now fully closed and starts a T3 Code
+thread for each on the self-hosted Mac runner (capped, guarded by the
 `agent-dispatched` label). See `docs/agents/auto-dispatch.md`.
 
 ### Issue tracker
@@ -22,6 +22,14 @@ The five default labels: `needs-triage`, `needs-info`, `ready-for-agent`, `ready
 ### Domain docs
 
 Single-context: one root `CONTEXT.md` plus `docs/adr/`, both created lazily. See `docs/agents/domain.md`.
+
+### Session orchestration
+
+In T3 Code, read `docs/agents/t3-code.md` before delegating, handing off,
+running worker/verifier loops, watching PRs or operating simulators. Its
+T3 mechanics take precedence over Paseo commands in shared skills.
+Paseo-launched sessions retain their Paseo mechanics. Reuse the registered
+project and current thread's checkout for helpers.
 
 ## Conventions
 
