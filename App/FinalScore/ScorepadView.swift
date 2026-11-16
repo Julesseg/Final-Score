@@ -20,7 +20,7 @@ struct ScorepadView: View {
     @Environment(\.verticalSizeClass) private var verticalSizeClass
     @ScaledMetric(relativeTo: .headline) private var teamColumnWidth: CGFloat = 88
     @ScaledMetric(relativeTo: .title3) private var roundAndAddRowHeight: CGFloat = 104
-    @State private var roundsViewportHeight: CGFloat = 0
+    @State private var roundsLayout = RoundsLayout()
     @State private var horizontalOffset: CGFloat = 0
     @State private var columnDrag: ColumnDrag?
 
@@ -116,10 +116,16 @@ struct ScorepadView: View {
     private static let roundColumnWidth: CGFloat = 44
     private var abbreviatedNames: [Team.ID: String] { TeamLabels.abbreviations(for: teams) }
 
+    private struct RoundsLayout: Equatable {
+        var viewportHeight: CGFloat = 0
+        var contentHeight: CGFloat = 0
+    }
+
     private struct ScrollTarget: Hashable {
         let selection: Scorepad.Position?
         let width: CGFloat
         let height: CGFloat
+        var contentHeight: CGFloat = 0
     }
 
     private var grid: some View {
@@ -147,15 +153,17 @@ struct ScorepadView: View {
                             }
                             .listStyle(.plain)
                             .accessibilityIdentifier("roundsViewport")
-                            .onGeometryChange(for: CGFloat.self) { $0.size.height } action: {
-                                roundsViewportHeight = $0
+                            .onScrollGeometryChange(for: RoundsLayout.self) {
+                                RoundsLayout(viewportHeight: $0.containerSize.height, contentHeight: $0.contentSize.height)
+                            } action: { _, layout in
+                                roundsLayout = layout
                             }
-                            .task(id: ScrollTarget(selection: scorepad.selection, width: columnWidth, height: roundsViewportHeight)) {
+                            .task(id: ScrollTarget(selection: scorepad.selection, width: columnWidth, height: roundsLayout.viewportHeight, contentHeight: roundsLayout.contentHeight)) {
                                 await Task.yield()
                                 guard !Task.isCancelled, let selection = scorepad.selection else { return }
                                 if selection.round == scorepad.match.rounds.last?.id,
                                    !scorepad.match.isEnded,
-                                   roundsViewportHeight >= roundAndAddRowHeight {
+                                   roundsLayout.viewportHeight >= roundAndAddRowHeight {
                                     scroller.scrollTo(Self.newRoundRowID, anchor: .bottom)
                                 } else {
                                     scroller.scrollTo(selection.round, anchor: .center)
