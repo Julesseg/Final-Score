@@ -18,8 +18,9 @@ final class FinalScoreUITests: XCTestCase {
         if UIDevice.current.userInterfaceIdiom == .pad {
             assertSimultaneousKeypads(stacked: false, lastQuickScore: 12)
         } else {
+            assertPhoneAdvancePlacement(quickValues: false)
             app.buttons["key.mode"].tap()
-            waitForKeypadToSettle()
+            assertPhoneAdvancePlacement(quickValues: true)
             XCTAssertFalse(app.buttons["key.1"].exists)
             XCTAssertEqual(app.buttons["quickScore.3"].frame.minY, app.buttons["quickScore.0"].frame.minY, accuracy: 1)
             XCTAssertGreaterThanOrEqual(app.buttons["quickScore.0"].frame.width, 44)
@@ -105,7 +106,9 @@ final class FinalScoreUITests: XCTestCase {
         if UIDevice.current.userInterfaceIdiom == .pad {
             assertSimultaneousKeypads(stacked: true)
         } else {
+            assertPhoneAdvancePlacement(quickValues: false)
             app.buttons["key.mode"].tap()
+            assertPhoneAdvancePlacement(quickValues: true)
         }
         app.buttons["quickScore.1"].tap()
         press("plusOne")
@@ -138,6 +141,28 @@ final class FinalScoreUITests: XCTestCase {
                 && Date().timeIntervalSince(stableSince) >= 0.5
         }
         XCTAssertEqual(XCTWaiter.wait(for: [XCTNSPredicateExpectation(predicate: settled, object: adjustment)], timeout: 5), .completed)
+    }
+
+    private func assertPhoneAdvancePlacement(quickValues: Bool) {
+        waitForKeypadToSettle()
+        let next = app.buttons["key.next"]
+        let plus = app.buttons["key.plusOne"]
+        let minus = app.buttons["key.minusOne"]
+        let mode = app.buttons["key.mode"]
+        let placed = NSPredicate { _, _ in
+            guard next.exists, plus.exists, minus.exists, mode.exists else { return false }
+            guard [plus, minus, mode].allSatisfy({
+                abs($0.frame.minX - next.frame.minX) <= 1 && abs($0.frame.width - next.frame.width) <= 1
+            }), next.frame.minY >= mode.frame.maxY,
+               next.frame.width >= 44, next.frame.height >= 44 else { return false }
+            if quickValues {
+                let grid = self.app.scrollViews["quickScoreGrid"]
+                return grid.exists && abs(grid.frame.minY - plus.frame.minY) <= 1
+                    && abs(grid.frame.maxY - next.frame.maxY) <= 1
+            }
+            return abs(self.app.buttons["quickScore.0"].frame.minY - next.frame.minY) <= 1
+        }
+        XCTAssertEqual(XCTWaiter.wait(for: [XCTNSPredicateExpectation(predicate: placed, object: next)], timeout: 5), .completed)
     }
 
     private func assertSimultaneousKeypads(stacked: Bool, lastQuickScore: Int = 3) {

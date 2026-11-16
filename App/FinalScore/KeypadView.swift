@@ -56,7 +56,7 @@ struct KeypadDock<Content: View, Keypad: View>: View {
                         }
                         .accessibilityIdentifier("keypadViewport")
                         .scrollBounceBehavior(.basedOnSize)
-                        .frame(width: compactKeys ? 304 : 384)
+                        .frame(width: compactKeys ? (layout == .switchable ? 320 : 304) : 384)
                         .transition(transition(from: .trailing))
                     }
                 }
@@ -163,8 +163,17 @@ struct KeypadView<Target: KeypadTarget>: View {
         digitsHeight + spacing + nextHeight
     }
 
+    private var phoneFooterHeight: CGFloat {
+        max(keyHeight, quickScoreWidth)
+    }
+
+    private var phonePanelHeight: CGFloat {
+        digitsHeight + spacing + phoneFooterHeight
+    }
+
     private var quickGridHeight: CGFloat {
-        showsBothKeypads && layout == .stacked ? inputHeight - numericPanelHeight - spacing : inputHeight
+        if layout == .switchable { return phonePanelHeight }
+        return showsBothKeypads && layout == .stacked ? inputHeight - numericPanelHeight - spacing : inputHeight
     }
 
     var body: some View {
@@ -179,17 +188,11 @@ struct KeypadView<Target: KeypadTarget>: View {
                 Text(target.keypadText)
                     .font(.title2.bold().monospacedDigit())
                     .accessibilityIdentifier("keypadDisplay")
-                if !quickScores.isEmpty && !isCompact && !showsBothKeypads {
-                    modeButton
-                }
                 Button("Hide Keypad", systemImage: "keyboard.chevron.compact.down") { target.deselect() }
                     .labelStyle(.iconOnly)
                     .accessibilityIdentifier("hideKeypadButton")
             }
             .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { headerHeight = $0 }
-            if !quickScores.isEmpty && !isCompact && !showsQuickScores && !showsBothKeypads {
-                quickScoreRow
-            }
             if showsBothKeypads {
                 let panels = layout == .stacked
                     ? AnyLayout(VStackLayout(spacing: spacing))
@@ -209,6 +212,27 @@ struct KeypadView<Target: KeypadTarget>: View {
                     .frame(width: layout == .sideBySide ? 4 * max(44, adjustmentWidth) + 3 * spacing : nil)
                 }
                 .frame(height: inputHeight)
+            } else if layout == .switchable {
+                HStack(alignment: .top, spacing: spacing) {
+                    if showsQuickScores && !quickScores.isEmpty {
+                        quickScoreGrid
+                    } else {
+                        VStack(spacing: spacing) {
+                            digits
+                                .frame(height: digitsHeight)
+                            if !quickScores.isEmpty {
+                                quickScoreRow
+                                    .frame(height: phoneFooterHeight)
+                            }
+                        }
+                    }
+                    VStack(spacing: spacing) {
+                        adjustmentKeys
+                            .frame(height: digitsHeight)
+                        compactNextButton
+                    }
+                }
+                .frame(height: phonePanelHeight)
             } else {
                 HStack(spacing: spacing) {
                     if showsQuickScores && !quickScores.isEmpty {
@@ -220,26 +244,7 @@ struct KeypadView<Target: KeypadTarget>: View {
                 }
                 .frame(height: digitsHeight)
             }
-            if !showsBothKeypads && isCompact && !quickScores.isEmpty && !showsQuickScores {
-                ViewThatFits(in: .horizontal) {
-                    HStack(spacing: spacing) {
-                        quickScoreButtons.fixedSize(horizontal: true, vertical: false)
-                        nextButton.fixedSize(horizontal: true, vertical: false)
-                    }
-                    HStack(spacing: spacing) {
-                        quickScoreButtons.fixedSize(horizontal: true, vertical: false)
-                        compactNextButton
-                    }
-                    HStack(spacing: spacing) {
-                        ScrollView(.horizontal) {
-                            quickScoreButtons
-                        }
-                        .scrollIndicators(.hidden)
-                        compactNextButton
-                    }
-                }
-                .frame(maxWidth: .infinity)
-            } else if !showsBothKeypads {
+            if !showsBothKeypads && layout != .switchable {
                 nextButton
                     .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { nextHeight = $0 }
             }
@@ -252,12 +257,15 @@ struct KeypadView<Target: KeypadTarget>: View {
     }
 
     private var modeButton: some View {
-        Button(showsQuickScores ? "Show Keypad" : "Show Quick Scores",
-               systemImage: showsQuickScores ? "keyboard" : "square.grid.3x3") {
+        Button {
             showsQuickScores.toggle()
+        } label: {
+            Label(showsQuickScores ? "Show Keypad" : "Show Quick Scores",
+                  systemImage: showsQuickScores ? "keyboard" : "square.grid.3x3")
+                .labelStyle(.iconOnly)
+                .frame(minWidth: 44, maxWidth: .infinity, minHeight: 44)
+                .contentShape(Rectangle())
         }
-        .labelStyle(.iconOnly)
-        .frame(minWidth: 44, minHeight: 44)
         .accessibilityIdentifier("key.mode")
     }
 
@@ -267,7 +275,7 @@ struct KeypadView<Target: KeypadTarget>: View {
                 .accessibilityLabel("Add \(step)")
             key(Text("−\(step)"), identifier: "key.minusOne", fillsHeight: true) { target.adjust(by: -step) }
                 .accessibilityLabel("Subtract \(step)")
-            if !quickScores.isEmpty && isCompact && !showsBothKeypads {
+            if !quickScores.isEmpty && !showsBothKeypads {
                 modeButton
             }
         }
@@ -300,7 +308,7 @@ struct KeypadView<Target: KeypadTarget>: View {
     }
 
     private var quickScoreGrid: some View {
-        let rows = showsBothKeypads ? quickScoreRows : min(4, quickScoreRows)
+        let rows = showsBothKeypads ? quickScoreRows : min(5, quickScoreRows)
         let height = max(keyHeight, (quickGridHeight - CGFloat(rows - 1) * spacing) / CGFloat(rows))
         let columns = showsBothKeypads
             ? [GridItem(.adaptive(minimum: gridKeyMinimumWidth), spacing: spacing)]
@@ -342,7 +350,7 @@ struct KeypadView<Target: KeypadTarget>: View {
         Button(action: next) {
             Image(systemName: nextSymbol)
                 .font(.headline)
-                .frame(width: keyHeight, height: keyHeight)
+                .frame(width: adjustColumnWidth, height: phoneFooterHeight)
                 .foregroundStyle(.white)
                 .background(.tint, in: Capsule())
         }
