@@ -6,6 +6,100 @@ import XCTest
 final class FinalScoreUITests: XCTestCase {
     private lazy var app = XCUIApplication()
 
+    func testDraggingANameInsertsTheColumnAndPreservesScoresDealersAndEntry() {
+        launch()
+        startMatch("Skyjo", players: ["Ada", "Grace", "Linus"])
+        press("1", "0", "next", "2", "0", "next", "3", "0", "next", "4")
+        attachScreenshot(named: "Columns before insertion")
+
+        let firstName = app.staticTexts["teamName.0"]
+        let lastName = app.staticTexts["teamName.2"]
+        firstName.press(forDuration: 1, thenDragTo: lastName, withVelocity: .slow, thenHoldForDuration: 0.5)
+        let inserted = XCTNSPredicateExpectation(predicate: NSPredicate(format: "label == 'Grace'"), object: firstName)
+        XCTAssertEqual(XCTWaiter.wait(for: [inserted], timeout: 5), .completed)
+        XCTAssertEqual(app.staticTexts["teamName.1"].label, "Linus")
+        XCTAssertEqual(lastName.label, "Ada")
+        XCTAssertEqual(app.buttons["score.1.0"].value as? String, "20")
+        XCTAssertEqual(app.buttons["score.1.1"].value as? String, "30")
+        XCTAssertEqual(app.buttons["score.1.2"].value as? String, "10")
+        XCTAssertEqual(total(0), "20")
+        XCTAssertEqual(total(2), "14")
+        XCTAssertEqual(app.staticTexts["keypadTitle"].label, "Ada · Round 2")
+        XCTAssertEqual(app.staticTexts["keypadDisplay"].label, "4")
+        press("2")
+        XCTAssertEqual(app.buttons["score.2.2"].value as? String, "42")
+        attachScreenshot(named: "Inserted column keeps the selected score")
+
+        hideKeypad()
+        XCTAssertEqual(dealer(inRound: 1), "Ada")
+        XCTAssertEqual(dealer(inRound: 2), "Grace")
+        let adaScore = app.buttons["score.1.2"]
+        XCTAssertGreaterThanOrEqual(app.buttons["dealer.1"].frame.midX, adaScore.frame.minX)
+        XCTAssertLessThanOrEqual(app.buttons["dealer.1"].frame.midX, adaScore.frame.maxX)
+        app.buttons["newRoundButton"].tap()
+        hideKeypad()
+        XCTAssertEqual(dealer(inRound: 3), "Linus", "The next dealer follows the seating when the Round is created")
+        attachScreenshot(named: "New round uses the reordered seating")
+
+        app.terminate()
+        app.launch()
+        let savedMatch = app.buttons.matching(identifier: "matchRow").firstMatch
+        XCTAssertTrue(savedMatch.waitForExistence(timeout: 5))
+        savedMatch.tap()
+        XCTAssertTrue(app.staticTexts["teamName.0"].waitForExistence(timeout: 5))
+        XCTAssertEqual(app.staticTexts["teamName.0"].label, "Grace")
+        XCTAssertEqual(app.staticTexts["teamName.2"].label, "Ada")
+        hideKeypad()
+        XCTAssertEqual(total(2), "52")
+        XCTAssertEqual(dealer(inRound: 1), "Ada")
+        XCTAssertEqual(dealer(inRound: 3), "Linus")
+    }
+
+    func testDraggingAtBothEdgesReachesHiddenColumns() {
+        launch()
+        startMatch("Skyjo", players: ["Ada", "Grace", "Linus", "Marie", "Alan", "Edsger", "Katherine", "Margaret"])
+        press("7")
+        hideKeypad()
+        if app.frame.width >= 600 {
+            app.terminate()
+            app.launchArguments = ["-UIPreferredContentSizeCategoryName", "UICTContentSizeCategoryAccessibilityL"]
+            app.launch()
+            let savedMatch = app.buttons.matching(identifier: "matchRow").firstMatch
+            XCTAssertTrue(savedMatch.waitForExistence(timeout: 5))
+            savedMatch.tap()
+            hideKeypad()
+        }
+        let viewport = element("scorepadViewport")
+        viewport.swipeRight()
+        let first = app.staticTexts["teamName.0"]
+        let last = app.staticTexts["teamName.7"]
+        XCTAssertGreaterThan(last.frame.maxX, viewport.frame.maxX, "The destination starts off screen")
+        attachScreenshot(named: "Before dragging to hidden columns")
+
+        let origin = app.coordinate(withNormalizedOffset: .zero)
+        let rightEdge = origin.withOffset(CGVector(dx: viewport.frame.maxX - app.frame.minX - 8, dy: first.frame.midY - app.frame.minY))
+        first.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5))
+            .press(forDuration: 1, thenDragTo: rightEdge, withVelocity: .slow, thenHoldForDuration: 4)
+        let insertedLast = XCTNSPredicateExpectation(predicate: NSPredicate(format: "label == 'Ada'"), object: last)
+        XCTAssertEqual(XCTWaiter.wait(for: [insertedLast], timeout: 5), .completed)
+        XCTAssertTrue(last.isHittable, "Holding at the edge reveals the off-screen destination")
+        XCTAssertEqual(app.staticTexts["teamName.6"].label, "Margaret")
+        XCTAssertEqual(app.buttons["score.1.7"].value as? String, "7")
+        XCTAssertEqual(dealer(inRound: 1), "Ada")
+        attachScreenshot(named: "Right edge scroll inserts Ada after the hidden names")
+
+        let leftEdge = origin.withOffset(CGVector(dx: viewport.frame.minX - app.frame.minX + 8, dy: last.frame.midY - app.frame.minY))
+        last.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5))
+            .press(forDuration: 1, thenDragTo: leftEdge, withVelocity: .slow, thenHoldForDuration: 4)
+        let insertedFirst = XCTNSPredicateExpectation(predicate: NSPredicate(format: "label == 'Ada'"), object: first)
+        XCTAssertEqual(XCTWaiter.wait(for: [insertedFirst], timeout: 5), .completed)
+        XCTAssertTrue(first.isHittable)
+        XCTAssertEqual(app.staticTexts["teamName.1"].label, "Grace")
+        XCTAssertEqual(app.buttons["score.1.0"].value as? String, "7")
+        XCTAssertEqual(dealer(inRound: 1), "Ada")
+        attachScreenshot(named: "Left edge scroll restores Ada to the first column")
+    }
+
     func testQuickInputsAndLeaderboardPreserveRoundEntry() {
         launch()
         makeQuickInputGame()
@@ -424,12 +518,28 @@ final class FinalScoreUITests: XCTestCase {
         attachScreenshot(named: "Scorepad after a deleted Round, landscape")
     }
 
-    func testARoundOfAScorepadTooWideToSwipeIsDeletedFromItsMenu() throws {
+    func testHorizontalScrollingDoesNotOfferDeletionAndTheRoundMenuStillDeletes() throws {
         launch()
         // Five columns overflow a portrait iPhone, so a sideways drag scrolls.
         startMatch("Skyjo", players: ["Ada", "Grace", "Linus", "Marie", "Alan"])
         press("1", "next", "2", "next", "3", "next", "4", "next", "5", "next", "6")
         hideKeypad()
+
+        let firstScore = app.buttons["score.1.0"]
+        let start = firstScore.frame.midX
+        let overflows = app.buttons["score.1.4"].frame.maxX > element("scorepadViewport").frame.maxX
+        firstScore.swipeLeft()
+        XCTAssertFalse(app.buttons["Delete Round"].exists)
+        if overflows {
+            XCTAssertLessThan(firstScore.frame.midX, start, "A sideways swipe scrolls the scorepad")
+        }
+        element("scorepadViewport").swipeRight()
+        app.staticTexts["teamName.0"].swipeLeft()
+        XCTAssertEqual(app.staticTexts["teamName.0"].label, "Ada", "Reordering requires holding the name first")
+        if overflows {
+            XCTAssertLessThan(firstScore.frame.midX, start, "A quick header swipe also scrolls the scorepad")
+        }
+        element("scorepadViewport").swipeRight()
 
         app.buttons["score.1.0"].press(forDuration: 1)
         let delete = app.buttons["Delete Round"]
@@ -1157,7 +1267,11 @@ final class FinalScoreUITests: XCTestCase {
         XCTAssertTrue(app.buttons["key.next"].waitForNonExistence(timeout: 5))
 
         // Round 2 was misdealt.
-        app.buttons["score.2.0"].swipeLeft()
+        let expanded = XCTNSPredicateExpectation(predicate: NSPredicate { [self] _, _ in
+            element("scorepadViewport").frame.width > app.windows.firstMatch.frame.width * 0.8
+        }, object: nil)
+        XCTAssertEqual(XCTWaiter.wait(for: [expanded], timeout: 5), .completed)
+        app.buttons["score.2.0"].press(forDuration: 1)
         let delete = app.buttons["Delete Round"]
         XCTAssertTrue(delete.waitForExistence(timeout: 5))
         delete.tap()
