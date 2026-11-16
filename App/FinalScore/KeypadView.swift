@@ -145,16 +145,20 @@ struct KeypadView<Target: KeypadTarget>: View {
 
     private var inputHeight: CGFloat {
         guard showsBothKeypads else { return digitsHeight }
-        let available = max(digitsHeight, (availableHeight ?? 0) - headerHeight - nextHeight - 2 * spacing - 24)
+        let available = max(numericPanelHeight, (availableHeight ?? 0) - headerHeight - spacing - 24)
         if layout == .stacked {
-            return max(digitsHeight + spacing + keyHeight, available)
+            return max(numericPanelHeight + spacing + keyHeight, available)
         }
         let needed = CGFloat(quickScoreRows) * keyHeight + CGFloat(quickScoreRows - 1) * spacing
-        return max(digitsHeight, min(needed, available))
+        return max(numericPanelHeight, min(needed, available))
+    }
+
+    private var numericPanelHeight: CGFloat {
+        digitsHeight + spacing + nextHeight
     }
 
     private var quickGridHeight: CGFloat {
-        showsBothKeypads && layout == .stacked ? inputHeight - digitsHeight - spacing : inputHeight
+        showsBothKeypads && layout == .stacked ? inputHeight - numericPanelHeight - spacing : inputHeight
     }
 
     var body: some View {
@@ -185,14 +189,18 @@ struct KeypadView<Target: KeypadTarget>: View {
                     ? AnyLayout(VStackLayout(spacing: spacing))
                     : AnyLayout(HStackLayout(alignment: .top, spacing: spacing))
                 panels {
-                    HStack(spacing: spacing) {
-                        digits
-                            .frame(width: layout == .sideBySide ? 3 * max(44, adjustmentWidth) + 2 * spacing : nil)
-                        adjustmentKeys
-                    }
-                    .frame(height: digitsHeight)
                     quickScoreGrid
                         .frame(height: quickGridHeight)
+                    VStack(spacing: spacing) {
+                        HStack(spacing: spacing) {
+                            digits
+                            adjustmentKeys
+                        }
+                        .frame(height: digitsHeight)
+                        nextButton
+                            .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { nextHeight = $0 }
+                    }
+                    .frame(width: layout == .sideBySide ? 4 * max(44, adjustmentWidth) + 3 * spacing : nil)
                 }
                 .frame(height: inputHeight)
             } else {
@@ -206,7 +214,7 @@ struct KeypadView<Target: KeypadTarget>: View {
                 }
                 .frame(height: digitsHeight)
             }
-            if isCompact && !quickScores.isEmpty && !showsQuickScores && !showsBothKeypads {
+            if !showsBothKeypads && isCompact && !quickScores.isEmpty && !showsQuickScores {
                 ViewThatFits(in: .horizontal) {
                     HStack(spacing: spacing) {
                         quickScoreButtons.fixedSize(horizontal: true, vertical: false)
@@ -225,7 +233,7 @@ struct KeypadView<Target: KeypadTarget>: View {
                     }
                 }
                 .frame(maxWidth: .infinity)
-            } else {
+            } else if !showsBothKeypads {
                 nextButton
                     .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { nextHeight = $0 }
             }

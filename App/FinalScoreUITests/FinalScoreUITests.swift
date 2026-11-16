@@ -73,6 +73,12 @@ final class FinalScoreUITests: XCTestCase {
             assertSimultaneousKeypads(stacked: false, lastQuickScore: 12)
             XCTAssertEqual(element("keypadDisplay").label, "2")
             attachScreenshot(named: "Both iPad keypads side by side after rotating back")
+            press("next")
+            XCTAssertEqual(app.buttons["key.next"].label, "New Round")
+            XCTAssertEqual(app.buttons["key.next"].frame.minX, app.buttons["key.1"].frame.minX, accuracy: 1)
+            XCTAssertEqual(app.buttons["key.next"].frame.maxX, app.buttons["key.plusOne"].frame.maxX, accuracy: 1)
+            press("next")
+            XCTAssertTrue(element("keypadTitle").label.contains("Round 2"))
         } else {
             XCTAssertFalse(app.buttons["key.1"].exists, "The chosen mode survives hiding the keypad")
         }
@@ -134,12 +140,20 @@ final class FinalScoreUITests: XCTestCase {
         assertAllKeypadKeysAreVisible()
         let digit = app.buttons["key.1"]
         let quickScore = app.buttons["quickScore.0"]
+        let quickGrid = app.scrollViews["quickScoreGrid"]
+        let next = app.buttons["key.next"]
+        let adjustment = app.buttons["key.plusOne"]
+        let delete = app.buttons["key.delete"]
         let placed = NSPredicate { _, _ in
-            guard digit.exists, quickScore.exists else { return false }
+            guard digit.exists, quickGrid.exists, next.exists, adjustment.exists, delete.exists else { return false }
+            guard next.frame.minY >= delete.frame.maxY,
+                  abs(next.frame.minX - digit.frame.minX) <= 1,
+                  abs(next.frame.maxX - adjustment.frame.maxX) <= 1 else { return false }
             return stacked
-                ? quickScore.frame.minY >= self.app.buttons["key.0"].frame.maxY
-                : quickScore.frame.minX >= self.app.buttons["key.3"].frame.maxX
-                    && abs(quickScore.frame.minY - digit.frame.minY) <= 1
+                ? quickGrid.frame.maxY <= digit.frame.minY
+                : quickGrid.frame.maxX <= digit.frame.minX
+                    && abs(quickGrid.frame.minY - digit.frame.minY) <= 1
+                    && quickGrid.frame.maxY >= next.frame.maxY - 1
         }
         XCTAssertEqual(XCTWaiter.wait(for: [XCTNSPredicateExpectation(predicate: placed, object: quickScore)], timeout: 5), .completed)
         XCTAssertTrue(quickScore.isHittable)
@@ -270,12 +284,12 @@ final class FinalScoreUITests: XCTestCase {
         let keypad = element("keypadViewport")
         let firstKey = app.buttons["key.1"]
         let adjustmentKey = app.buttons["key.plusOne"]
-        let trailingKeys = UIDevice.current.userInterfaceIdiom == .pad && app.scrollViews["quickScoreGrid"].exists
-            ? app.scrollViews["quickScoreGrid"] : adjustmentKey
+        let hasBothKeypads = UIDevice.current.userInterfaceIdiom == .pad && app.scrollViews["quickScoreGrid"].exists
+        let leadingKeys = hasBothKeypads ? app.scrollViews["quickScoreGrid"] : firstKey
         let fillsWidth = NSPredicate { _, _ in
-            guard keypad.exists, firstKey.exists, trailingKeys.exists else { return false }
-            return abs(firstKey.frame.minX - keypad.frame.minX - 12) <= 1
-                && abs(keypad.frame.maxX - trailingKeys.frame.maxX - 12) <= 1
+            guard keypad.exists, leadingKeys.exists, adjustmentKey.exists else { return false }
+            return abs(leadingKeys.frame.minX - keypad.frame.minX - 12) <= 1
+                && abs(keypad.frame.maxX - adjustmentKey.frame.maxX - 12) <= 1
         }
         XCTAssertEqual(XCTWaiter.wait(for: [XCTNSPredicateExpectation(predicate: fillsWidth, object: keypad)], timeout: 5), .completed)
     }
