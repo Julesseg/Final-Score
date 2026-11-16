@@ -15,6 +15,8 @@ struct ScorepadView: View {
     let onRematch: () -> Void
     @State private var scorepad: Scorepad
     @State private var isConfirmingEnd = false
+    @State private var isShowingLeaderboard = false
+    @State private var showsQuickScores = false
     @Environment(\.verticalSizeClass) private var verticalSizeClass
     @ScaledMetric(relativeTo: .headline) private var teamColumnWidth: CGFloat = 88
     @State private var roundsViewportHeight: CGFloat = 0
@@ -41,12 +43,19 @@ struct ScorepadView: View {
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
             GameTitle(game: game)
+            ToolbarItem(placement: .primaryAction) {
+                Button("Leaderboard", systemImage: "list.number") { isShowingLeaderboard = true }
+                    .accessibilityIdentifier("leaderboardButton")
+            }
             if !scorepad.match.isEnded {
                 ToolbarItem(placement: .primaryAction) {
                     Button("End Match", systemImage: "flag.checkered") { isConfirmingEnd = true }
                         .accessibilityIdentifier("endMatchButton")
                 }
             }
+        }
+        .sheet(isPresented: $isShowingLeaderboard) {
+            LeaderboardView(match: scorepad.match)
         }
         .alert("End this Match?", isPresented: $isConfirmingEnd) {
             Button("Cancel", role: .cancel) {}
@@ -75,7 +84,7 @@ struct ScorepadView: View {
     // MARK: Keypad
 
     private func keypad(isCompact: Bool) -> some View {
-        KeypadView(target: $scorepad, title: keypadTitle, nextTitle: nextTitle, isCompact: isCompact) { scorepad.next() }
+        KeypadView(target: $scorepad, showsQuickScores: $showsQuickScores, title: keypadTitle, nextTitle: nextTitle, isCompact: isCompact) { scorepad.next() }
     }
 
     /// "Grace · Round 2"

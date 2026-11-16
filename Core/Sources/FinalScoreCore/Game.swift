@@ -15,6 +15,8 @@ public struct Game: Codable, Hashable, Sendable {
     public var endCondition: EndCondition
     /// One-tap values offered on the scorepad; empty hides them.
     public var quickScores: [Int]
+    public var pointsStep: Int?
+
     public var allowsNegative: Bool
     public var tracksDealer: Bool
     public var isBuiltIn: Bool
@@ -31,7 +33,8 @@ public struct Game: Codable, Hashable, Sendable {
         quickScores: [Int],
         allowsNegative: Bool,
         tracksDealer: Bool,
-        isBuiltIn: Bool
+        isBuiltIn: Bool,
+        pointsStep: Int? = nil
     ) {
         self.name = name
         self.symbol = symbol
@@ -42,10 +45,13 @@ public struct Game: Codable, Hashable, Sendable {
         self.direction = direction
         self.endCondition = endCondition
         self.quickScores = quickScores
+        self.pointsStep = pointsStep.map { max($0, 1) }
         self.allowsNegative = allowsNegative
         self.tracksDealer = tracksDealer
         self.isBuiltIn = isBuiltIn
     }
+
+    public var adjustmentStep: Int { max(pointsStep ?? 1, 1) }
 
     /// A named colour; the app decides how each one renders.
     public enum AccentToken: String, CaseIterable, Codable, Hashable, Sendable {

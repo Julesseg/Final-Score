@@ -20,13 +20,17 @@ struct GameFormView: View {
     /// Typed rather than bound to the draft, so the field can be cleared on the
     /// way to another number.
     @State private var targetText: String
+    @State private var pointsStepText: String
     @State private var newQuickScore = ""
-    @FocusState private var isTypingQuickScore: Bool
+    @FocusState private var focusedField: Field?
+
+    private enum Field: Hashable { case name, pointsStep, target, quickScore }
     @Environment(\.dismiss) private var dismiss
 
     init(games: GameLibrary, request: GameFormRequest) {
         self.games = games
         editing = request.editing
+        _pointsStepText = State(initialValue: request.draft.pointsStep.map(String.init) ?? "")
         _draft = State(initialValue: request.draft)
         _targetText = State(initialValue: request.draft.endCondition.target.map(String.init) ?? "")
     }
@@ -43,6 +47,12 @@ struct GameFormView: View {
             .navigationTitle(editing == nil ? "New Game" : "Edit Game")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
+                ToolbarItem(placement: .topBarTrailing) {
+                    if focusedField != nil {
+                        Button("Done", action: finishTyping)
+                            .accessibilityIdentifier("dismissGameKeyboardButton")
+                    }
+                }
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Cancel") { dismiss() }
                         .accessibilityIdentifier("cancelGameButton")
@@ -63,6 +73,7 @@ struct GameFormView: View {
             HStack(spacing: 12) {
                 GameSymbol(game: draft.game)
                 TextField("Name", text: $draft.name)
+                    .focused($focusedField, equals: .name)
                     .font(.headline)
                     .textInputAutocapitalization(.words)
                     .autocorrectionDisabled()
@@ -145,6 +156,16 @@ struct GameFormView: View {
                 Text("Lowest Total").tag(Game.Direction.lowWins)
             }
             .accessibilityIdentifier("directionPicker")
+            LabeledContent("Points Step") {
+                TextField("1 (default)", text: $pointsStepText)
+                    .focused($focusedField, equals: .pointsStep)
+                    .keyboardType(.numberPad)
+                    .multilineTextAlignment(.trailing)
+                    .accessibilityIdentifier("pointsStepField")
+            }
+            .onChange(of: pointsStepText) { _, text in
+                draft.pointsStep = Int(text)
+            }
             Toggle("Scores below 0", isOn: $draft.allowsNegative)
                 .accessibilityIdentifier("negativeToggle")
             if draft.structure == .rounds {
@@ -154,9 +175,10 @@ struct GameFormView: View {
         } header: {
             Text("Scoring")
         } footer: {
+            if !hasPointsStep { Text("Enter a Points Step of at least 1, or leave it blank.") }
             Text(draft.structure == .rounds
-                 ? "Each Round is one row of Scores."
-                 : "A Tally keeps a running Total that Scores are added to as they happen.")
+                 ? "Each Round is one row of Scores. Points Step changes the keypad’s add and subtract buttons; leave it blank for 1."
+                 : "A Tally keeps a running Total that Scores are added to as they happen. Points Step changes the keypad’s add and subtract buttons; leave it blank for 1.")
         }
     }
 
@@ -176,6 +198,7 @@ struct GameFormView: View {
             case .targetTotal:
                 LabeledContent("Target Total") {
                     TextField("Target", text: $targetText)
+                        .focused($focusedField, equals: .target)
                         .keyboardType(.numberPad)
                         .multilineTextAlignment(.trailing)
                         .accessibilityIdentifier("targetTotalField")
@@ -212,7 +235,7 @@ struct GameFormView: View {
             .onDelete { draft.removeQuickScores(atOffsets: $0) }
             TextField("Add a Quick score", text: $newQuickScore)
                 .keyboardType(.numbersAndPunctuation)
-                .focused($isTypingQuickScore)
+                .focused($focusedField, equals: .quickScore)
                 .submitLabel(.done)
                 .onSubmit(addQuickScore)
                 .accessibilityIdentifier("newQuickScore")
@@ -228,7 +251,11 @@ struct GameFormView: View {
     /// A name no other Game goes by, and a Target Total that is really typed:
     /// a field left blank or at 0 would save a target other than the one shown.
     private var canSave: Bool {
-        games.canSave(draft, replacing: editing) && hasTarget
+        games.canSave(draft, replacing: editing) && hasTarget && hasPointsStep
+    }
+
+    private var hasPointsStep: Bool {
+        pointsStepText.isEmpty || (Int(pointsStepText) ?? 0) > 0
     }
 
     private var hasTarget: Bool {
@@ -276,12 +303,20 @@ struct GameFormView: View {
     /// isn't a whole number is left in the field to be corrected.
     private func addQuickScore() {
         guard let points = Int(newQuickScore.trimmingCharacters(in: .whitespaces)) else {
-            isTypingQuickScore = !newQuickScore.isEmpty
+            focusedField = newQuickScore.isEmpty ? nil : .quickScore
             return
         }
         draft.addQuickScore(points)
         newQuickScore = ""
-        isTypingQuickScore = true
+        focusedField = .quickScore
+    }
+
+    private func finishTyping() {
+        if focusedField == .quickScore {
+            addQuickScore()
+            guard newQuickScore.isEmpty else { return }
+        }
+        focusedField = nil
     }
 
     private func save() {
