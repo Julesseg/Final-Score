@@ -1074,8 +1074,9 @@ final class FinalScoreUITests: XCTestCase {
     /// grid of symbols or a control and leaves the form where it is.
     @discardableResult
     private func dragFormToReveal(_ element: XCUIElement) -> XCUIElement {
+        let form = self.element("gameForm")
+        XCTAssertTrue(form.waitForExistence(timeout: 5))
         for _ in 0..<8 where !(element.exists && element.isHittable) {
-            let form = app.collectionViews.allElementsBoundByIndex.last(where: { $0.isHittable }) ?? app
             let keyboard = app.keyboards.firstMatch
             let startY = keyboard.exists ? min(0.75, (keyboard.frame.minY - form.frame.minY - 30) / form.frame.height) : 0.75
             form.coordinate(withNormalizedOffset: CGVector(dx: 0.97, dy: startY))
