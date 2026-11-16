@@ -216,11 +216,17 @@ final class FinalScoreUITests: XCTestCase {
         }
         XCTAssertEqual(XCTWaiter.wait(for: [XCTNSPredicateExpectation(predicate: fits, object: last)], timeout: 5), .completed)
         if stacked {
+            var lastFrames = "No keypad content area"
             let fillsHeight = NSPredicate { _, _ in
-                abs(self.app.buttons["key.next"].frame.maxY - viewport.frame.maxY + 12) <= 2
-                    && abs(self.element("keypadDisplay").frame.minY - viewport.frame.minY - 12) <= 2
+                guard let snapshot = try? self.app.snapshot(),
+                      let area = self.findSnapshot(snapshot, identifier: "keypadContentArea"),
+                      let next = self.findSnapshot(snapshot, identifier: "key.next"),
+                      let display = self.findSnapshot(snapshot, identifier: "keypadDisplay") else { return false }
+                lastFrames = "Area: \(area.frame), display: \(display.frame), next: \(next.frame)"
+                return abs(next.frame.maxY - area.frame.maxY + 12) <= 2
+                    && abs(display.frame.minY - area.frame.minY - 12) <= 2
             }
-            XCTAssertEqual(XCTWaiter.wait(for: [XCTNSPredicateExpectation(predicate: fillsHeight, object: viewport)], timeout: 5), .completed)
+            XCTAssertEqual(XCTWaiter.wait(for: [XCTNSPredicateExpectation(predicate: fillsHeight, object: viewport)], timeout: 5), .completed, lastFrames)
         } else if lastQuickScore >= 12 {
             XCTAssertEqual(app.buttons["quickScore.3"].frame.minY, quickScore.frame.minY, accuracy: 1)
         }
@@ -246,21 +252,38 @@ final class FinalScoreUITests: XCTestCase {
         step.typeKey(.rightArrow, modifierFlags: [])
         step.typeText(XCUIKeyboardKey.delete.rawValue + "5")
         XCTAssertEqual(step.value as? String, "5")
-        app.buttons["dismissGameKeyboardButton"].tap()
-        XCTAssertTrue(app.keyboards.firstMatch.waitForNonExistence(timeout: 5))
+        if UIDevice.current.userInterfaceIdiom == .pad {
+            // The native number-entry popover can cover the toolbar's Done button.
+            app.navigationBars["New Game"].coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).tap()
+            if app.buttons["dismissGameKeyboardButton"].exists { tapGameKeyboardDone() }
+        } else {
+            tapGameKeyboardDone()
+        }
+        let keyboardDismissed = app.keyboards.firstMatch.waitForNonExistence(timeout: 5)
+        if !keyboardDismissed { attachScreenshot(named: "Game form after Done") }
+        XCTAssertTrue(keyboardDismissed)
         attachScreenshot(named: "Optional points step in the Game form")
         if !tally {
             let quickScore = app.textFields["newQuickScore"]
             for points in stride(from: 175, through: 375, by: 25) {
                 dragFormToReveal(quickScore).tap()
                 quickScore.typeText("\(points)")
-                app.buttons["dismissGameKeyboardButton"].tap()
+                tapGameKeyboardDone()
             }
         }
         app.buttons["saveGameButton"].tap()
         let game = app.buttons["game.Tarot copy"]
         scrollListToReveal(game)
         game.tap()
+    }
+
+    private func tapGameKeyboardDone() {
+        let done = app.buttons["dismissGameKeyboardButton"]
+        let ready = NSPredicate { _, _ in done.exists && done.isHittable }
+        let result = XCTWaiter.wait(for: [XCTNSPredicateExpectation(predicate: ready, object: done)], timeout: 5)
+        if result != .completed { attachScreenshot(named: "Game toolbar Done not hittable") }
+        XCTAssertEqual(result, .completed, "Game form Done must be hittable")
+        done.tap()
     }
 
     func testTarotKeepsTheSelectedScoreVisibleWithTheKeypadOpen() {

@@ -53,6 +53,8 @@ struct KeypadDock<Content: View, Keypad: View>: View {
                                 .clipShape(RoundedRectangle(cornerRadius: 32, style: .continuous))
                                 .padding(.horizontal, 12)
                                 .frame(minHeight: proxy.size.height)
+                                .accessibilityElement(children: .contain)
+                                .accessibilityIdentifier("keypadContentArea")
                         }
                         .accessibilityIdentifier("keypadViewport")
                         .scrollBounceBehavior(.basedOnSize)
