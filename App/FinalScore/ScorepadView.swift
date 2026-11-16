@@ -3,7 +3,7 @@ import FinalScoreCore
 
 /// The paper scorepad: one column per Team, one row per Round, Totals along
 /// the bottom. Tapping a Score opens the keypad on it, however old the Round;
-/// swiping a Round, or its menu, deletes it; the + row under the last Round
+/// a Round's menu deletes it; the + row under the last Round
 /// starts the next one while the Match is in play. What each gesture and key
 /// does is `Scorepad`'s business, in Core. In a Game that tracks the Dealer, a
 /// badge marks who deals each Round, and tapping it hands the deal to someone
@@ -21,6 +21,12 @@ struct ScorepadView: View {
     @ScaledMetric(relativeTo: .headline) private var teamColumnWidth: CGFloat = 88
     @State private var roundsViewportHeight: CGFloat = 0
     @State private var horizontalOffset: CGFloat = 0
+    @State private var columnDrag: ColumnDrag?
+
+    private struct ColumnDrag {
+        let team: Team.ID
+        let translation: CGSize
+    }
 
     init(match: Binding<Match>, onRematch: @escaping () -> Void) {
         _match = match
@@ -174,24 +180,78 @@ struct ScorepadView: View {
                 .foregroundStyle(.secondary)
                 .frame(width: Self.roundColumnWidth)
             ForEach(Array(teams.enumerated()), id: \.element.id) { index, team in
-                ViewThatFits(in: .horizontal) {
-                    Text(team.name)
-                        .fixedSize(horizontal: true, vertical: false)
-                        .accessibilityLabel(team.name)
-                        .accessibilityIdentifier("teamName.\(index)")
-                    Text(abbreviatedNames[team.id] ?? team.name)
-                        .fixedSize(horizontal: true, vertical: false)
-                        .accessibilityLabel(team.name)
-                        .accessibilityIdentifier("teamName.\(index)")
+                if scorepad.match.isEnded {
+                    teamName(team, index: index, columnWidth: columnWidth)
+                } else {
+                    teamName(team, index: index, columnWidth: columnWidth)
+                        .background {
+                            if swapTarget(for: columnDrag, columnWidth: columnWidth) == team.id {
+                                RoundedRectangle(cornerRadius: 8)
+                                    .fill(scorepad.match.style(of: team.id).opacity(0.15))
+                            }
+                            if columnDrag?.team == team.id {
+                                RoundedRectangle(cornerRadius: 8).fill(.regularMaterial)
+                            }
+                        }
+                        .offset(columnDrag?.team == team.id ? columnDrag?.translation ?? .zero : .zero)
+                        .zIndex(columnDrag?.team == team.id ? 1 : 0)
+                        .overlay {
+                            ColumnReorderGesture { translation in
+                                columnDrag = translation.map { ColumnDrag(team: team.id, translation: $0) }
+                            } onEnded: { translation in
+                                withAnimation {
+                                    if let target = swapTarget(for: ColumnDrag(team: team.id, translation: translation), columnWidth: columnWidth) {
+                                        scorepad.swapTeams(team.id, target)
+                                    }
+                                    columnDrag = nil
+                                }
+                            }
+                        }
+                        .accessibilityHint("Hold and drag onto another name to swap columns")
+                        .accessibilityActions {
+                            if index > 0 {
+                                Button("Move left") {
+                                    withAnimation { scorepad.swapTeams(team.id, teams[index - 1].id) }
+                                }
+                            }
+                            if index + 1 < teams.count {
+                                Button("Move right") {
+                                    withAnimation { scorepad.swapTeams(team.id, teams[index + 1].id) }
+                                }
+                            }
+                        }
                 }
-                .font(.headline)
-                .foregroundStyle(scorepad.match.style(of: team.id))
-                .padding(.horizontal, 4)
-                .frame(width: columnWidth)
-                .id(team.id)
             }
         }
-        .padding(.vertical, 10)
+    }
+
+    private func swapTarget(for columnDrag: ColumnDrag?, columnWidth: CGFloat) -> Team.ID? {
+        guard let columnDrag, abs(columnDrag.translation.height) < 44,
+              let source = teams.firstIndex(where: { $0.id == columnDrag.team })
+        else { return nil }
+        let target = source + Int((columnDrag.translation.width / columnWidth).rounded())
+        guard teams.indices.contains(target), target != source else { return nil }
+        return teams[target].id
+    }
+
+    private func teamName(_ team: Team, index: Int, columnWidth: CGFloat) -> some View {
+        ViewThatFits(in: .horizontal) {
+            Text(team.name)
+                .fixedSize(horizontal: true, vertical: false)
+                .accessibilityLabel(team.name)
+                .accessibilityIdentifier("teamName.\(index)")
+            Text(abbreviatedNames[team.id] ?? team.name)
+                .fixedSize(horizontal: true, vertical: false)
+                .accessibilityLabel(team.name)
+                .accessibilityIdentifier("teamName.\(index)")
+        }
+        .font(.headline)
+        .foregroundStyle(scorepad.match.style(of: team.id))
+        .padding(.horizontal, 4)
+        .frame(width: columnWidth)
+        .frame(minHeight: 44)
+        .contentShape(Rectangle())
+        .id(team.id)
     }
 
     private func row(_ round: Round, number: Int, columnWidth: CGFloat) -> some View {
@@ -208,12 +268,6 @@ struct ScorepadView: View {
         .padding(.vertical, 2)
         .listRowInsets(EdgeInsets())
         .listRowSeparator(.hidden)
-        // A whole Round goes with no undo, so it takes a deliberate tap.
-        .swipeActions(allowsFullSwipe: false) {
-            deleteButton(for: round)
-        }
-        // Once the Teams overflow, a sideways drag scrolls the grid instead of
-        // swiping, so the Round's menu is the way to delete it at any width.
         .contextMenu {
             deleteButton(for: round)
         }
@@ -290,6 +344,9 @@ struct ScorepadView: View {
             .padding(.horizontal, 3)
         }
         .buttonStyle(.plain)
+        .contextMenu {
+            deleteButton(for: round)
+        }
         .accessibilityIdentifier("score.\(roundNumber).\(teamIndex)")
         .accessibilityLabel("\(team.name), Round \(roundNumber)")
         .accessibilityValue(points.map(String.init) ?? "Not scored")

@@ -142,6 +142,10 @@ public struct Scorepad: Sendable {
         match.setDealer(player, inRound: round)
     }
 
+    public mutating func swapTeams(_ one: Team.ID, _ other: Team.ID) {
+        match.swapTeams(one, other)
+    }
+
     private var teamAfterSelection: Team.ID? {
         guard let selection,
               let index = match.teams.firstIndex(where: { $0.id == selection.team }),

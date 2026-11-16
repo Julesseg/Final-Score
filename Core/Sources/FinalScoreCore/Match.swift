@@ -48,11 +48,11 @@ public struct Match: Codable, Hashable, Identifiable, Sendable {
     /// Matches are listed.
     public let startedAt: Date
     public let game: Game
-    /// Composed at setup and fixed for the whole Match.
-    public let teams: [Team]
+    public private(set) var teams: [Team]
+    internal private(set) var teamAccentOrder: [Team.ID]?
     /// Where everyone sits and which way the deal passes; nil in a Game that
     /// doesn't track the Dealer.
-    public let seating: Seating?
+    public private(set) var seating: Seating?
     /// Always empty in a Tally Match.
     public private(set) var rounds: [Round]
     /// The Scores of a Tally Match, in the order they were recorded. Always
@@ -89,6 +89,7 @@ public struct Match: Codable, Hashable, Identifiable, Sendable {
         startedAt = try container.decode(Date.self, forKey: .startedAt)
         game = try container.decode(Game.self, forKey: .game)
         teams = try container.decode([Team].self, forKey: .teams)
+        teamAccentOrder = try container.decodeIfPresent([Team.ID].self, forKey: .teamAccentOrder)
         seating = try container.decodeIfPresent(Seating.self, forKey: .seating)
         rounds = try container.decode([Round].self, forKey: .rounds)
         tallyScores = try container.decodeIfPresent([Score].self, forKey: .tallyScores) ?? []
@@ -110,6 +111,28 @@ public struct Match: Codable, Hashable, Identifiable, Sendable {
               let index = rounds.firstIndex(where: { $0.id == round })
         else { return }
         rounds[index].dealer = player
+    }
+
+    public mutating func swapTeams(_ one: Team.ID, _ other: Team.ID) {
+        guard !isEnded, one != other,
+              let first = teams.firstIndex(where: { $0.id == one }),
+              let second = teams.firstIndex(where: { $0.id == other })
+        else { return }
+        if teamAccentOrder == nil {
+            teamAccentOrder = teams.map(\.id)
+        }
+        let swappedPlayers = zip(teams[first].players, teams[second].players)
+        if let seating {
+            var order = seating.order
+            for (one, other) in swappedPlayers {
+                guard let firstSeat = order.firstIndex(of: one.id),
+                      let secondSeat = order.firstIndex(of: other.id)
+                else { continue }
+                order.swapAt(firstSeat, secondSeat)
+            }
+            self.seating = Seating(order: order, rotation: seating.rotation)
+        }
+        teams.swapAt(first, second)
     }
 
     /// Everyone playing, in Seating order — which in a Team Game is not the

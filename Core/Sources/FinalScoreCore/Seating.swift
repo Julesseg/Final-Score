@@ -1,7 +1,7 @@
 import Foundation
 
 /// Where the Players of a Game that tracks the Dealer sit around the table, and
-/// which way the deal passes. Fixed at Match setup.
+/// which way the deal passes.
 public struct Seating: Codable, Hashable, Sendable {
     /// Which way the deal passes around the table.
     public enum Rotation: String, Codable, Hashable, Sendable {
