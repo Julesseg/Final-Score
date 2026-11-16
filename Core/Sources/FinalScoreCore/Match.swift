@@ -113,26 +113,31 @@ public struct Match: Codable, Hashable, Identifiable, Sendable {
         rounds[index].dealer = player
     }
 
-    public mutating func swapTeams(_ one: Team.ID, _ other: Team.ID) {
-        guard !isEnded, one != other,
-              let first = teams.firstIndex(where: { $0.id == one }),
-              let second = teams.firstIndex(where: { $0.id == other })
-        else { return }
+    public func teams(moving team: Team.ID, to destination: Int) -> [Team] {
+        guard !isEnded, teams.indices.contains(destination),
+              let source = teams.firstIndex(where: { $0.id == team })
+        else { return teams }
+        var ordered = teams
+        ordered.insert(ordered.remove(at: source), at: destination)
+        return ordered
+    }
+
+    public mutating func moveTeam(_ team: Team.ID, to destination: Int) {
+        let ordered = teams(moving: team, to: destination)
+        guard ordered != teams else { return }
         if teamAccentOrder == nil {
             teamAccentOrder = teams.map(\.id)
         }
-        let swappedPlayers = zip(teams[first].players, teams[second].players)
         if let seating {
-            var order = seating.order
-            for (one, other) in swappedPlayers {
-                guard let firstSeat = order.firstIndex(of: one.id),
-                      let secondSeat = order.firstIndex(of: other.id)
-                else { continue }
-                order.swapAt(firstSeat, secondSeat)
+            var movedSeats: [Player.ID: Player.ID] = [:]
+            for (before, after) in zip(teams, ordered) {
+                for (one, other) in zip(before.players, after.players) {
+                    movedSeats[one.id] = other.id
+                }
             }
-            self.seating = Seating(order: order, rotation: seating.rotation)
+            self.seating = Seating(order: seating.order.map { movedSeats[$0] ?? $0 }, rotation: seating.rotation)
         }
-        teams.swapAt(first, second)
+        teams = ordered
     }
 
     /// Everyone playing, in Seating order — which in a Team Game is not the

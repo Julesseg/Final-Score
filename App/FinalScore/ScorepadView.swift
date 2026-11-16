@@ -175,48 +175,51 @@ struct ScorepadView: View {
     }
 
     private func header(columnWidth: CGFloat) -> some View {
-        HStack(spacing: 0) {
+        let preview = previewTeams(columnWidth: columnWidth)
+        return HStack(spacing: 0) {
             Text("#")
                 .foregroundStyle(.secondary)
                 .frame(width: Self.roundColumnWidth)
             ForEach(Array(teams.enumerated()), id: \.element.id) { index, team in
+                let previewIndex = preview.firstIndex(where: { $0.id == team.id }) ?? index
+                let isDragging = columnDrag?.team == team.id
                 if scorepad.match.isEnded {
                     teamName(team, index: index, columnWidth: columnWidth)
                 } else {
                     teamName(team, index: index, columnWidth: columnWidth)
                         .background {
-                            if swapTarget(for: columnDrag, columnWidth: columnWidth) == team.id {
-                                RoundedRectangle(cornerRadius: 8)
-                                    .fill(scorepad.match.style(of: team.id).opacity(0.15))
-                            }
-                            if columnDrag?.team == team.id {
+                            if isDragging {
                                 RoundedRectangle(cornerRadius: 8).fill(.regularMaterial)
                             }
                         }
-                        .offset(columnDrag?.team == team.id ? columnDrag?.translation ?? .zero : .zero)
-                        .zIndex(columnDrag?.team == team.id ? 1 : 0)
+                        .offset(
+                            x: isDragging ? columnDrag?.translation.width ?? 0 : CGFloat(previewIndex - index) * columnWidth,
+                            y: isDragging ? columnDrag?.translation.height ?? 0 : 0
+                        )
+                        .animation(isDragging ? nil : .snappy(duration: 0.16), value: preview.map(\.id))
+                        .zIndex(isDragging ? 1 : 0)
                         .overlay {
                             ColumnReorderGesture { translation in
                                 columnDrag = translation.map { ColumnDrag(team: team.id, translation: $0) }
                             } onEnded: { translation in
                                 withAnimation {
-                                    if let target = swapTarget(for: ColumnDrag(team: team.id, translation: translation), columnWidth: columnWidth) {
-                                        scorepad.swapTeams(team.id, target)
+                                    if let destination = insertionIndex(for: ColumnDrag(team: team.id, translation: translation), columnWidth: columnWidth) {
+                                        scorepad.moveTeam(team.id, to: destination)
                                     }
                                     columnDrag = nil
                                 }
                             }
                         }
-                        .accessibilityHint("Hold and drag onto another name to swap columns")
+                        .accessibilityHint("Hold and drag to move this column")
                         .accessibilityActions {
                             if index > 0 {
                                 Button("Move left") {
-                                    withAnimation { scorepad.swapTeams(team.id, teams[index - 1].id) }
+                                    withAnimation { scorepad.moveTeam(team.id, to: index - 1) }
                                 }
                             }
                             if index + 1 < teams.count {
                                 Button("Move right") {
-                                    withAnimation { scorepad.swapTeams(team.id, teams[index + 1].id) }
+                                    withAnimation { scorepad.moveTeam(team.id, to: index + 1) }
                                 }
                             }
                         }
@@ -225,13 +228,16 @@ struct ScorepadView: View {
         }
     }
 
-    private func swapTarget(for columnDrag: ColumnDrag?, columnWidth: CGFloat) -> Team.ID? {
-        guard let columnDrag, abs(columnDrag.translation.height) < 44,
+    private func previewTeams(columnWidth: CGFloat) -> [Team] {
+        guard let columnDrag, let destination = insertionIndex(for: columnDrag, columnWidth: columnWidth) else { return teams }
+        return scorepad.match.teams(moving: columnDrag.team, to: destination)
+    }
+
+    private func insertionIndex(for columnDrag: ColumnDrag, columnWidth: CGFloat) -> Int? {
+        guard abs(columnDrag.translation.height) < 44,
               let source = teams.firstIndex(where: { $0.id == columnDrag.team })
         else { return nil }
-        let target = source + Int((columnDrag.translation.width / columnWidth).rounded())
-        guard teams.indices.contains(target), target != source else { return nil }
-        return teams[target].id
+        return min(teams.count - 1, max(0, source + Int((columnDrag.translation.width / columnWidth).rounded())))
     }
 
     private func teamName(_ team: Team, index: Int, columnWidth: CGFloat) -> some View {

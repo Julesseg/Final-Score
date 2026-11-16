@@ -6,29 +6,29 @@ import XCTest
 final class FinalScoreUITests: XCTestCase {
     private lazy var app = XCUIApplication()
 
-    func testDraggingANameSwapsColumnsAndPreservesScoresDealersAndEntry() {
+    func testDraggingANameInsertsTheColumnAndPreservesScoresDealersAndEntry() {
         launch()
         startMatch("Skyjo", players: ["Ada", "Grace", "Linus"])
         press("1", "0", "next", "2", "0", "next", "3", "0", "next", "4")
-        attachScreenshot(named: "Columns before swapping")
+        attachScreenshot(named: "Columns before insertion")
 
         let firstName = app.staticTexts["teamName.0"]
         let lastName = app.staticTexts["teamName.2"]
         firstName.press(forDuration: 1, thenDragTo: lastName, withVelocity: .slow, thenHoldForDuration: 0.5)
-        let swapped = XCTNSPredicateExpectation(predicate: NSPredicate(format: "label == 'Linus'"), object: firstName)
-        XCTAssertEqual(XCTWaiter.wait(for: [swapped], timeout: 5), .completed)
-        XCTAssertEqual(app.staticTexts["teamName.1"].label, "Grace")
+        let inserted = XCTNSPredicateExpectation(predicate: NSPredicate(format: "label == 'Grace'"), object: firstName)
+        XCTAssertEqual(XCTWaiter.wait(for: [inserted], timeout: 5), .completed)
+        XCTAssertEqual(app.staticTexts["teamName.1"].label, "Linus")
         XCTAssertEqual(lastName.label, "Ada")
-        XCTAssertEqual(app.buttons["score.1.0"].value as? String, "30")
-        XCTAssertEqual(app.buttons["score.1.1"].value as? String, "20")
+        XCTAssertEqual(app.buttons["score.1.0"].value as? String, "20")
+        XCTAssertEqual(app.buttons["score.1.1"].value as? String, "30")
         XCTAssertEqual(app.buttons["score.1.2"].value as? String, "10")
-        XCTAssertEqual(total(0), "30")
+        XCTAssertEqual(total(0), "20")
         XCTAssertEqual(total(2), "14")
         XCTAssertEqual(app.staticTexts["keypadTitle"].label, "Ada · Round 2")
         XCTAssertEqual(app.staticTexts["keypadDisplay"].label, "4")
         press("2")
         XCTAssertEqual(app.buttons["score.2.2"].value as? String, "42")
-        attachScreenshot(named: "Swapped columns keep the selected score")
+        attachScreenshot(named: "Inserted column keeps the selected score")
 
         hideKeypad()
         XCTAssertEqual(dealer(inRound: 1), "Ada")
@@ -38,8 +38,8 @@ final class FinalScoreUITests: XCTestCase {
         XCTAssertLessThanOrEqual(app.buttons["dealer.1"].frame.midX, adaScore.frame.maxX)
         app.buttons["newRoundButton"].tap()
         hideKeypad()
-        XCTAssertEqual(dealer(inRound: 3), "Ada", "The next dealer follows the seating when the Round is created")
-        attachScreenshot(named: "New round uses the swapped seating")
+        XCTAssertEqual(dealer(inRound: 3), "Linus", "The next dealer follows the seating when the Round is created")
+        attachScreenshot(named: "New round uses the reordered seating")
 
         app.terminate()
         app.launch()
@@ -47,12 +47,57 @@ final class FinalScoreUITests: XCTestCase {
         XCTAssertTrue(savedMatch.waitForExistence(timeout: 5))
         savedMatch.tap()
         XCTAssertTrue(app.staticTexts["teamName.0"].waitForExistence(timeout: 5))
-        XCTAssertEqual(app.staticTexts["teamName.0"].label, "Linus")
+        XCTAssertEqual(app.staticTexts["teamName.0"].label, "Grace")
         XCTAssertEqual(app.staticTexts["teamName.2"].label, "Ada")
         hideKeypad()
         XCTAssertEqual(total(2), "52")
         XCTAssertEqual(dealer(inRound: 1), "Ada")
-        XCTAssertEqual(dealer(inRound: 3), "Ada")
+        XCTAssertEqual(dealer(inRound: 3), "Linus")
+    }
+
+    func testDraggingAtBothEdgesReachesHiddenColumns() {
+        launch()
+        startMatch("Skyjo", players: ["Ada", "Grace", "Linus", "Marie", "Alan", "Edsger", "Katherine", "Margaret"])
+        press("7")
+        hideKeypad()
+        if app.frame.width >= 600 {
+            app.terminate()
+            app.launchArguments = ["-UIPreferredContentSizeCategoryName", "UICTContentSizeCategoryAccessibilityL"]
+            app.launch()
+            let savedMatch = app.buttons.matching(identifier: "matchRow").firstMatch
+            XCTAssertTrue(savedMatch.waitForExistence(timeout: 5))
+            savedMatch.tap()
+            hideKeypad()
+        }
+        let viewport = element("scorepadViewport")
+        viewport.swipeRight()
+        let first = app.staticTexts["teamName.0"]
+        let last = app.staticTexts["teamName.7"]
+        XCTAssertGreaterThan(last.frame.maxX, viewport.frame.maxX, "The destination starts off screen")
+        attachScreenshot(named: "Before dragging to hidden columns")
+
+        let origin = app.coordinate(withNormalizedOffset: .zero)
+        let rightEdge = origin.withOffset(CGVector(dx: viewport.frame.maxX - app.frame.minX - 8, dy: first.frame.midY - app.frame.minY))
+        first.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5))
+            .press(forDuration: 1, thenDragTo: rightEdge, withVelocity: .slow, thenHoldForDuration: 4)
+        let insertedLast = XCTNSPredicateExpectation(predicate: NSPredicate(format: "label == 'Ada'"), object: last)
+        XCTAssertEqual(XCTWaiter.wait(for: [insertedLast], timeout: 5), .completed)
+        XCTAssertTrue(last.isHittable, "Holding at the edge reveals the off-screen destination")
+        XCTAssertEqual(app.staticTexts["teamName.6"].label, "Margaret")
+        XCTAssertEqual(app.buttons["score.1.7"].value as? String, "7")
+        XCTAssertEqual(dealer(inRound: 1), "Ada")
+        attachScreenshot(named: "Right edge scroll inserts Ada after the hidden names")
+
+        let leftEdge = origin.withOffset(CGVector(dx: viewport.frame.minX - app.frame.minX + 8, dy: last.frame.midY - app.frame.minY))
+        last.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5))
+            .press(forDuration: 1, thenDragTo: leftEdge, withVelocity: .slow, thenHoldForDuration: 4)
+        let insertedFirst = XCTNSPredicateExpectation(predicate: NSPredicate(format: "label == 'Ada'"), object: first)
+        XCTAssertEqual(XCTWaiter.wait(for: [insertedFirst], timeout: 5), .completed)
+        XCTAssertTrue(first.isHittable)
+        XCTAssertEqual(app.staticTexts["teamName.1"].label, "Grace")
+        XCTAssertEqual(app.buttons["score.1.0"].value as? String, "7")
+        XCTAssertEqual(dealer(inRound: 1), "Ada")
+        attachScreenshot(named: "Left edge scroll restores Ada to the first column")
     }
 
     func testQuickInputsAndLeaderboardPreserveRoundEntry() {
