@@ -40,7 +40,7 @@ jobs:
       - name: Toolchain versions
         run: xcodebuild -version
 
-      - name: Resolve an available iPhone simulator
+      - name: Resolve available iPhone and iPad simulators
         id: sim
         run: |
           set -euo pipefail
@@ -48,6 +48,10 @@ jobs:
             | python3 -c "import json,sys; d=json.load(sys.stdin)['devices']; names=[x['name'] for rt in d for x in d[rt] if x['name'].startswith('iPhone')]; print(sorted(names)[-1] if names else 'iPhone 16')")
           echo "Using simulator: $NAME"
           echo "name=$NAME" >> "$GITHUB_OUTPUT"
+          IPAD_NAME=$(xcrun simctl list devices available --json \
+            | python3 -c "import json,sys; d=json.load(sys.stdin)['devices']; names=[x['name'] for rt in d for x in d[rt] if x['name'].startswith('iPad')]; print(sorted(names)[-1])")
+          echo "Using iPad simulator: $IPAD_NAME"
+          echo "ipad-name=$IPAD_NAME" >> "$GITHUB_OUTPUT"
 
       - name: Build & run UI tests
         working-directory: App
@@ -60,10 +64,26 @@ jobs:
             -resultBundlePath TestResults.xcresult \
             CODE_SIGNING_ALLOWED=NO
 
+      - name: Verify iPad keypad layouts and scoring
+        working-directory: App
+        run: |
+          set -o pipefail
+          xcodebuild test \
+            -project "$APP_NAME.xcodeproj" \
+            -scheme "$APP_NAME" \
+            -destination "platform=iOS Simulator,name=${{ steps.sim.outputs.ipad-name }},OS=latest" \
+            -parallel-testing-enabled NO \
+            -only-testing:FinalScoreUITests/FinalScoreUITests/testQuickInputsAndLeaderboardPreserveRoundEntry \
+            -only-testing:FinalScoreUITests/FinalScoreUITests/testTallyQuickInputsAndLeaderboardInLandscape \
+            -resultBundlePath iPadTestResults.xcresult \
+            CODE_SIGNING_ALLOWED=NO
+
       - name: Upload test results
         if: ${{ !cancelled() }}
         uses: actions/upload-artifact@v4
         with:
           name: ui-test-results
-          path: App/TestResults.xcresult
+          path: |
+            App/TestResults.xcresult
+            App/iPadTestResults.xcresult
           if-no-files-found: ignore

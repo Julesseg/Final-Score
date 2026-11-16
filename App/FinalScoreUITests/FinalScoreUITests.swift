@@ -16,9 +16,13 @@ final class FinalScoreUITests: XCTestCase {
         attachScreenshot(named: "Points step on the numeric keypad")
 
         let digitWidth = app.buttons["key.1"].frame.width
-        app.buttons["key.mode"].tap()
-        XCTAssertFalse(app.buttons["key.1"].exists)
-        XCTAssertGreaterThanOrEqual(app.buttons["quickScore.0"].frame.width, digitWidth - 1)
+        if UIDevice.current.userInterfaceIdiom == .pad {
+            assertSimultaneousKeypads(stacked: false)
+        } else {
+            app.buttons["key.mode"].tap()
+            XCTAssertFalse(app.buttons["key.1"].exists)
+            XCTAssertGreaterThanOrEqual(app.buttons["quickScore.0"].frame.width, digitWidth - 1)
+        }
         app.buttons["quickScore.0"].tap()
         press("plusOne", "minusOne")
         XCTAssertEqual(total(0), "25")
@@ -33,10 +37,14 @@ final class FinalScoreUITests: XCTestCase {
         XCTAssertEqual(total(0), "375")
         attachScreenshot(named: "Many quick scores scroll beside fixed step buttons")
 
-        app.buttons["key.mode"].tap()
+        if app.buttons["key.mode"].exists { app.buttons["key.mode"].tap() }
         press("3", "plusOne", "next")
         XCTAssertEqual(total(0), "8", "Custom entry ignores the step")
-        app.buttons["key.mode"].tap()
+        if app.buttons["key.mode"].exists {
+            app.buttons["key.mode"].tap()
+        } else {
+            for _ in 0..<4 where !app.buttons["quickScore.1"].isHittable { quickGrid.swipeDown() }
+        }
         app.buttons["quickScore.1"].tap()
         app.buttons["leaderboardButton"].tap()
         XCTAssertTrue(element("leaderboardRow.0").waitForExistence(timeout: 5))
@@ -53,7 +61,21 @@ final class FinalScoreUITests: XCTestCase {
         hideKeypad()
         app.buttons["score.1.1"].tap()
         XCTAssertTrue(app.buttons["quickScore.1"].waitForExistence(timeout: 5))
-        XCTAssertFalse(app.buttons["key.1"].exists, "The chosen mode survives hiding the keypad")
+        if UIDevice.current.userInterfaceIdiom == .pad {
+            assertSimultaneousKeypads(stacked: false)
+            XCUIDevice.shared.orientation = .landscapeLeft
+            assertSimultaneousKeypads(stacked: true)
+            attachScreenshot(named: "Both iPad keypads stacked in landscape")
+            app.buttons["quickScore.0"].tap()
+            press("7", "minusOne")
+            XCTAssertEqual(total(1), "2")
+            XCUIDevice.shared.orientation = .portrait
+            assertSimultaneousKeypads(stacked: false)
+            XCTAssertEqual(element("keypadDisplay").label, "2")
+            attachScreenshot(named: "Both iPad keypads side by side after rotating back")
+        } else {
+            XCTAssertFalse(app.buttons["key.1"].exists, "The chosen mode survives hiding the keypad")
+        }
     }
 
     func testTallyQuickInputsAndLeaderboardInLandscape() {
@@ -61,10 +83,18 @@ final class FinalScoreUITests: XCTestCase {
         makeQuickInputGame(tally: true)
         pickPlayers(["Ada", "Grace", "Linus"])
         tapStart()
-        XCUIDevice.shared.orientation = .landscapeLeft
         app.buttons["total.0"].tap()
+        if UIDevice.current.userInterfaceIdiom == .pad {
+            assertSimultaneousKeypads(stacked: false)
+            attachScreenshot(named: "Both iPad tally keypads in portrait")
+        }
+        XCUIDevice.shared.orientation = .landscapeLeft
         waitForKeypadToSettle()
-        app.buttons["key.mode"].tap()
+        if UIDevice.current.userInterfaceIdiom == .pad {
+            assertSimultaneousKeypads(stacked: true)
+        } else {
+            app.buttons["key.mode"].tap()
+        }
         app.buttons["quickScore.1"].tap()
         press("plusOne")
         XCTAssertEqual(total(0), "55")
@@ -81,21 +111,40 @@ final class FinalScoreUITests: XCTestCase {
     }
 
     private func waitForKeypadToSettle() {
-        let mode = app.buttons["key.mode"]
+        let adjustment = app.buttons["key.plusOne"]
         let viewport = element("keypadViewport")
         var previousFrame = CGRect.null
         var stableSince = Date()
         let settled = NSPredicate { _, _ in
-            guard mode.exists, viewport.exists else { return false }
-            let frame = mode.frame
+            guard adjustment.exists, viewport.exists else { return false }
+            let frame = adjustment.frame
             if frame != previousFrame {
                 previousFrame = frame
                 stableSince = Date()
             }
-            return mode.isHittable && viewport.frame.intersection(self.app.frame).contains(frame)
+            return adjustment.isHittable && viewport.frame.intersection(self.app.frame).contains(frame)
                 && Date().timeIntervalSince(stableSince) >= 0.5
         }
-        XCTAssertEqual(XCTWaiter.wait(for: [XCTNSPredicateExpectation(predicate: settled, object: mode)], timeout: 5), .completed)
+        XCTAssertEqual(XCTWaiter.wait(for: [XCTNSPredicateExpectation(predicate: settled, object: adjustment)], timeout: 5), .completed)
+    }
+
+    private func assertSimultaneousKeypads(stacked: Bool) {
+        waitForKeypadToSettle()
+        XCTAssertFalse(app.buttons["key.mode"].exists)
+        assertAllKeypadKeysAreVisible()
+        let digit = app.buttons["key.1"]
+        let quickScore = app.buttons["quickScore.0"]
+        let placed = NSPredicate { _, _ in
+            guard digit.exists, quickScore.exists else { return false }
+            return stacked
+                ? quickScore.frame.minY >= self.app.buttons["key.0"].frame.maxY
+                : quickScore.frame.minX >= self.app.buttons["key.3"].frame.maxX
+                    && abs(quickScore.frame.minY - digit.frame.minY) <= 1
+        }
+        XCTAssertEqual(XCTWaiter.wait(for: [XCTNSPredicateExpectation(predicate: placed, object: quickScore)], timeout: 5), .completed)
+        XCTAssertTrue(quickScore.isHittable)
+        XCTAssertGreaterThanOrEqual(quickScore.frame.width, 44)
+        XCTAssertGreaterThanOrEqual(quickScore.frame.height, 44)
     }
 
     private func makeQuickInputGame(tally: Bool = false) {
