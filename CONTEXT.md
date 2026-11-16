@@ -77,8 +77,13 @@ contracts, say. Declared per Game; a Game may offer none, in which case the
 scorepad hides them.
 _Avoid_: chip, shortcut, preset score, step
 
+**Points step**:
+The optional positive whole number used by the keypad's add and subtract
+buttons, defaulting to 1. It does not restrict Quick scores or an Override.
+_Avoid_: multiplier, rounding, minimum Score
+
 **Override**:
-Entering a Score by keypad, ignoring the Step entirely. Always available, in
+Entering a Score by keypad, ignoring the Points step entirely. Always available, in
 every Game, on every Score.
 _Avoid_: manual entry, custom score, free entry
 
@@ -100,6 +105,11 @@ _Avoid_: game over, limit, win condition
 The Team whose Total wins under the Game's Direction when a Match is ended.
 Always derived, never stored, so correcting an old Score corrects the Winner.
 _Avoid_: champion, leader (the leader is whoever is winning mid-Match)
+
+**Leaderboard**:
+The Teams in a Match ordered by their current Totals under the Game's Direction.
+Teams with equal Totals share a rank and keep their column order.
+_Avoid_: final results, Winner list
 
 ### Starting again
 

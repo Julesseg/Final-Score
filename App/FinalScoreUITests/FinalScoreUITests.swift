@@ -6,6 +6,135 @@ import XCTest
 final class FinalScoreUITests: XCTestCase {
     private lazy var app = XCUIApplication()
 
+    func testQuickInputsAndLeaderboardPreserveRoundEntry() {
+        launch()
+        makeQuickInputGame()
+        pickPlayers(["Ada", "Grace", "Linus"])
+        tapStart()
+        XCTAssertEqual(app.buttons["key.plusOne"].label, "Add 5")
+        XCTAssertEqual(app.buttons["key.minusOne"].label, "Subtract 5")
+        attachScreenshot(named: "Points step on the numeric keypad")
+
+        let digitWidth = app.buttons["key.1"].frame.width
+        app.buttons["key.mode"].tap()
+        XCTAssertFalse(app.buttons["key.1"].exists)
+        XCTAssertGreaterThanOrEqual(app.buttons["quickScore.0"].frame.width, digitWidth - 1)
+        app.buttons["quickScore.0"].tap()
+        press("plusOne", "minusOne")
+        XCTAssertEqual(total(0), "25")
+        attachScreenshot(named: "Large quick scores with step adjustments")
+        let lastQuickScore = app.buttons["quickScore.12"]
+        let quickGrid = app.scrollViews["quickScoreGrid"]
+        for _ in 0..<4 where !lastQuickScore.isHittable { quickGrid.swipeUp() }
+        XCTAssertTrue(lastQuickScore.isHittable)
+        XCTAssertTrue(app.buttons["key.plusOne"].isHittable)
+        XCTAssertTrue(app.buttons["key.minusOne"].isHittable)
+        lastQuickScore.tap()
+        XCTAssertEqual(total(0), "375")
+        attachScreenshot(named: "Many quick scores scroll beside fixed step buttons")
+
+        app.buttons["key.mode"].tap()
+        press("3", "plusOne", "next")
+        XCTAssertEqual(total(0), "8", "Custom entry ignores the step")
+        app.buttons["key.mode"].tap()
+        app.buttons["quickScore.1"].tap()
+        app.buttons["leaderboardButton"].tap()
+        XCTAssertTrue(element("leaderboardRow.0").waitForExistence(timeout: 5))
+        XCTAssertEqual(element("leaderboardRow.0").label, "Rank 1, Grace, 50 points")
+        XCTAssertEqual(element("leaderboardRow.1").label, "Rank 2, Ada, 8 points")
+        XCTAssertEqual(element("leaderboardRow.2").label, "Rank 3, Linus, 0 points")
+        attachScreenshot(named: "Live leaderboard includes the score being entered")
+        app.buttons["closeLeaderboardButton"].tap()
+        XCTAssertTrue(app.buttons["quickScore.1"].waitForExistence(timeout: 5))
+        XCTAssertEqual(element("keypadDisplay").label, "50")
+        XCTAssertTrue(element("keypadTitle").label.contains("Grace"))
+        press("plusOne")
+        XCTAssertEqual(total(1), "55")
+        hideKeypad()
+        app.buttons["score.1.1"].tap()
+        XCTAssertTrue(app.buttons["quickScore.1"].waitForExistence(timeout: 5))
+        XCTAssertFalse(app.buttons["key.1"].exists, "The chosen mode survives hiding the keypad")
+    }
+
+    func testTallyQuickInputsAndLeaderboardInLandscape() {
+        launch()
+        makeQuickInputGame(tally: true)
+        pickPlayers(["Ada", "Grace", "Linus"])
+        tapStart()
+        XCUIDevice.shared.orientation = .landscapeLeft
+        app.buttons["total.0"].tap()
+        waitForKeypadToSettle()
+        app.buttons["key.mode"].tap()
+        app.buttons["quickScore.1"].tap()
+        press("plusOne")
+        XCTAssertEqual(total(0), "55")
+        attachScreenshot(named: "Tally quick scores in landscape")
+        app.buttons["leaderboardButton"].tap()
+        XCTAssertTrue(element("leaderboardRow.0").waitForExistence(timeout: 5))
+        XCTAssertEqual(element("leaderboardRow.0").label, "Rank 1, Ada, 55 points")
+        XCTAssertEqual(element("leaderboardRow.1").label, "Rank 2, Grace, 0 points")
+        XCTAssertEqual(element("leaderboardRow.2").label, "Rank 2, Linus, 0 points")
+        attachScreenshot(named: "Tally leaderboard in landscape")
+        app.buttons["closeLeaderboardButton"].tap()
+        press("minusOne", "next")
+        XCTAssertEqual(total(0), "50")
+    }
+
+    private func waitForKeypadToSettle() {
+        let mode = app.buttons["key.mode"]
+        let viewport = element("keypadViewport")
+        var previousFrame = CGRect.null
+        var stableSince = Date()
+        let settled = NSPredicate { _, _ in
+            guard mode.exists, viewport.exists else { return false }
+            let frame = mode.frame
+            if frame != previousFrame {
+                previousFrame = frame
+                stableSince = Date()
+            }
+            return mode.isHittable && viewport.frame.intersection(self.app.frame).contains(frame)
+                && Date().timeIntervalSince(stableSince) >= 0.5
+        }
+        XCTAssertEqual(XCTWaiter.wait(for: [XCTNSPredicateExpectation(predicate: settled, object: mode)], timeout: 5), .completed)
+    }
+
+    private func makeQuickInputGame(tally: Bool = false) {
+        openGamePicker()
+        let tarot = app.buttons["game.Tarot"]
+        scrollListToReveal(tarot)
+        tarot.press(forDuration: 1.2)
+        app.buttons["Duplicate & Edit"].tap()
+        if tally {
+            let structure = dragFormToReveal(app.segmentedControls["structurePicker"])
+            structure.buttons["Tally"].tap()
+            XCTAssertTrue(structure.buttons["Tally"].isSelected)
+        }
+        let step = app.textFields["pointsStepField"]
+        dragFormToReveal(step).tap()
+        XCTAssertTrue(app.keyboards.firstMatch.waitForExistence(timeout: 5))
+        step.typeText("0")
+        XCTAssertEqual(step.value as? String, "0")
+        XCTAssertFalse(app.buttons["saveGameButton"].isEnabled)
+        step.typeKey(.rightArrow, modifierFlags: [])
+        step.typeText(XCUIKeyboardKey.delete.rawValue + "5")
+        XCTAssertEqual(step.value as? String, "5")
+        app.buttons["dismissGameKeyboardButton"].tap()
+        XCTAssertTrue(app.keyboards.firstMatch.waitForNonExistence(timeout: 5))
+        attachScreenshot(named: "Optional points step in the Game form")
+        if !tally {
+            let quickScore = app.textFields["newQuickScore"]
+            for points in stride(from: 175, through: 375, by: 25) {
+                dragFormToReveal(quickScore).tap()
+                quickScore.typeText("\(points)")
+                app.buttons["dismissGameKeyboardButton"].tap()
+            }
+        }
+        app.buttons["saveGameButton"].tap()
+        let game = app.buttons["game.Tarot copy"]
+        scrollListToReveal(game)
+        game.tap()
+    }
+
     func testTarotKeepsTheSelectedScoreVisibleWithTheKeypadOpen() {
         launch()
         startMatch("Tarot", players: ["Ada", "Grace", "Linus"])
@@ -816,8 +945,11 @@ final class FinalScoreUITests: XCTestCase {
     @discardableResult
     private func dragFormToReveal(_ element: XCUIElement) -> XCUIElement {
         for _ in 0..<8 where !(element.exists && element.isHittable) {
-            app.coordinate(withNormalizedOffset: CGVector(dx: 0.97, dy: 0.75))
-                .press(forDuration: 0.1, thenDragTo: app.coordinate(withNormalizedOffset: CGVector(dx: 0.97, dy: 0.3)))
+            let form = app.collectionViews.allElementsBoundByIndex.last(where: { $0.isHittable }) ?? app
+            let keyboard = app.keyboards.firstMatch
+            let startY = keyboard.exists ? min(0.75, (keyboard.frame.minY - form.frame.minY - 30) / form.frame.height) : 0.75
+            form.coordinate(withNormalizedOffset: CGVector(dx: 0.97, dy: startY))
+                .press(forDuration: 0.1, thenDragTo: form.coordinate(withNormalizedOffset: CGVector(dx: 0.97, dy: 0.3)))
         }
         XCTAssertTrue(element.exists && element.isHittable, "\(element.identifier) never came into reach")
         return element

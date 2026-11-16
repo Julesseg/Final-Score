@@ -85,9 +85,10 @@ struct KeypadDock<Content: View, Keypad: View>: View {
 }
 
 /// The keypad Override — digits, sign and delete — with the Game's Quick scores
-/// above it and −1 / +1 beside it, all aimed at the selected Score.
+/// above it and step adjustments beside it, all aimed at the selected Score.
 struct KeypadView<Target: KeypadTarget>: View {
     @Binding var target: Target
+    @Binding var showsQuickScores: Bool
     let title: String
     let nextTitle: String
     var isCompact = false
@@ -124,44 +125,35 @@ struct KeypadView<Target: KeypadTarget>: View {
                 Text(target.keypadText)
                     .font(.title2.bold().monospacedDigit())
                     .accessibilityIdentifier("keypadDisplay")
+                if !quickScores.isEmpty && !isCompact {
+                    modeButton
+                }
                 Button("Hide Keypad", systemImage: "keyboard.chevron.compact.down") { target.deselect() }
                     .labelStyle(.iconOnly)
                     .accessibilityIdentifier("hideKeypadButton")
             }
-            if !quickScores.isEmpty && !isCompact {
+            if !quickScores.isEmpty && !isCompact && !showsQuickScores {
                 quickScoreRow
             }
             HStack(spacing: spacing) {
-                Grid(horizontalSpacing: spacing, verticalSpacing: spacing) {
-                    ForEach([[1, 2, 3], [4, 5, 6], [7, 8, 9]], id: \.self) { digits in
-                        GridRow {
-                            ForEach(digits, id: \.self, content: digitKey)
-                        }
-                    }
-                    GridRow {
-                        if target.match.game.allowsNegative {
-                            key(Text("±"), identifier: "key.sign") { target.toggleSign() }
-                                .accessibilityLabel("Change sign")
-                        } else {
-                            Color.clear.frame(height: keyHeight)
-                        }
-                        digitKey(0)
-                        key(Image(systemName: "delete.left"), identifier: "key.delete") { target.deleteBackward() }
-                            .accessibilityLabel("Delete")
-                    }
+                if showsQuickScores && !quickScores.isEmpty {
+                    quickScoreGrid
+                } else {
+                    digits
                 }
-                // Each spans two rows of digits: the keys most often tapped twice running.
                 VStack(spacing: spacing) {
-                    key(Text("+1"), identifier: "key.plusOne", fillsHeight: true) { target.adjust(by: 1) }
-                        .accessibilityLabel("Add 1")
-                    key(Text("−1"), identifier: "key.minusOne", fillsHeight: true) { target.adjust(by: -1) }
-                        .accessibilityLabel("Subtract 1")
+                    key(Text("+\(step)"), identifier: "key.plusOne", fillsHeight: true) { target.adjust(by: step) }
+                        .accessibilityLabel("Add \(step)")
+                    key(Text("−\(step)"), identifier: "key.minusOne", fillsHeight: true) { target.adjust(by: -step) }
+                        .accessibilityLabel("Subtract \(step)")
+                    if !quickScores.isEmpty && isCompact {
+                        modeButton
+                    }
                 }
                 .frame(width: adjustColumnWidth)
             }
-            // As tall as the digits, which the ±1 column then stretches to fill.
-            .fixedSize(horizontal: false, vertical: true)
-            if isCompact && !quickScores.isEmpty {
+            .frame(height: digitsHeight)
+            if isCompact && !quickScores.isEmpty && !showsQuickScores {
                 ViewThatFits(in: .horizontal) {
                     HStack(spacing: spacing) {
                         quickScoreButtons.fixedSize(horizontal: true, vertical: false)
@@ -189,6 +181,65 @@ struct KeypadView<Target: KeypadTarget>: View {
             keypadWidth = $0
         }
         .background(.bar)
+    }
+
+    private var modeButton: some View {
+        Button(showsQuickScores ? "Show Keypad" : "Show Quick Scores",
+               systemImage: showsQuickScores ? "keyboard" : "square.grid.3x3") {
+            showsQuickScores.toggle()
+        }
+        .labelStyle(.iconOnly)
+        .frame(minWidth: 44, minHeight: 44)
+        .accessibilityIdentifier("key.mode")
+    }
+
+    private var step: Int { target.match.game.adjustmentStep }
+
+    private var digitsHeight: CGFloat { 4 * keyHeight + 3 * spacing }
+
+    private var digits: some View {
+        Grid(horizontalSpacing: spacing, verticalSpacing: spacing) {
+            ForEach([[1, 2, 3], [4, 5, 6], [7, 8, 9]], id: \.self) { digits in
+                GridRow {
+                    ForEach(digits, id: \.self, content: digitKey)
+                }
+            }
+            GridRow {
+                if target.match.game.allowsNegative {
+                    key(Text("±"), identifier: "key.sign") { target.toggleSign() }
+                        .accessibilityLabel("Change sign")
+                } else {
+                    Color.clear.frame(height: keyHeight)
+                }
+                digitKey(0)
+                key(Image(systemName: "delete.left"), identifier: "key.delete") { target.deleteBackward() }
+                    .accessibilityLabel("Delete")
+            }
+        }
+    }
+
+    private var quickScoreGrid: some View {
+        let rows = max(1, min(4, (quickScores.count + 2) / 3))
+        let height = (digitsHeight - CGFloat(rows - 1) * spacing) / CGFloat(rows)
+        return ScrollView(.vertical) {
+            LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: spacing), count: 3), spacing: spacing) {
+                ForEach(Array(quickScores.enumerated()), id: \.offset) { index, points in
+                    Button { target.enterQuickScore(points) } label: {
+                        Text("\(points)")
+                            .font(.title2.bold().monospacedDigit())
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.6)
+                            .frame(maxWidth: .infinity, minHeight: height)
+                            .background(.tint.opacity(0.15), in: RoundedRectangle(cornerRadius: 12))
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityIdentifier("quickScore.\(index)")
+                }
+            }
+        }
+        .scrollBounceBehavior(.basedOnSize)
+        .frame(maxWidth: .infinity)
+        .accessibilityIdentifier("quickScoreGrid")
     }
 
     private var nextButton: some View {

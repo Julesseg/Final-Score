@@ -11,6 +11,8 @@ struct TallyView: View {
     let onRematch: () -> Void
     @State private var pad: TallyPad
     @State private var isConfirmingEnd = false
+    @State private var isShowingLeaderboard = false
+    @State private var showsQuickScores = false
     @State private var isShowingHistory = false
     @Environment(\.verticalSizeClass) private var verticalSizeClass
 
@@ -35,12 +37,19 @@ struct TallyView: View {
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
             GameTitle(game: pad.match.game)
+            ToolbarItem(placement: .primaryAction) {
+                Button("Leaderboard", systemImage: "list.number") { isShowingLeaderboard = true }
+                    .accessibilityIdentifier("leaderboardButton")
+            }
             if !pad.match.isEnded {
                 ToolbarItem(placement: .primaryAction) {
                     Button("End Match", systemImage: "flag.checkered") { isConfirmingEnd = true }
                         .accessibilityIdentifier("endMatchButton")
                 }
             }
+        }
+        .sheet(isPresented: $isShowingLeaderboard) {
+            LeaderboardView(match: pad.match)
         }
         .alert("End this Match?", isPresented: $isConfirmingEnd) {
             Button("Cancel", role: .cancel) {}
@@ -243,6 +252,7 @@ struct TallyView: View {
     private func keypad(isCompact: Bool) -> some View {
         KeypadView(
             target: $pad,
+            showsQuickScores: $showsQuickScores,
             title: keypadTitle,
             nextTitle: "Done",
             isCompact: isCompact

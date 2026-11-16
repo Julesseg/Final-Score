@@ -47,6 +47,7 @@ public struct GameDraft: Hashable, Sendable {
         structure = game.structure
         endCondition = game.endCondition
         allowsNegative = game.allowsNegative
+        pointsStep = game.pointsStep
     }
 
     /// Whether there is a name, not counting spaces.
@@ -167,6 +168,11 @@ public struct GameDraft: Hashable, Sendable {
             settings.allowsNegative = newValue
             settings.quickScores = Self.tidy(settings.quickScores, allowsNegative: newValue)
         }
+    }
+
+    public var pointsStep: Int? {
+        get { settings.pointsStep }
+        set { settings.pointsStep = newValue.map { max($0, 1) } }
     }
 
     // MARK: Quick scores
