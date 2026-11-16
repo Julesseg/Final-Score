@@ -127,20 +127,37 @@ final class FinalScoreUITests: XCTestCase {
 
     private func waitForKeypadToSettle() {
         let adjustment = app.buttons["key.plusOne"]
-        let viewport = element("keypadViewport")
         var previousFrame = CGRect.null
         var stableSince = Date()
+        var lastSample = "No keypad snapshot"
         let settled = NSPredicate { _, _ in
-            guard adjustment.exists, viewport.exists else { return false }
-            let frame = adjustment.frame
+            guard let snapshot = try? self.app.snapshot(),
+                  let viewport = self.findSnapshot(snapshot, identifier: "keypadViewport"),
+                  let button = self.findSnapshot(snapshot, identifier: "key.plusOne") else {
+                lastSample = "Snapshot missing keypad controls"
+                return false
+            }
+            let frame = button.frame
+            lastSample = "Window: \(snapshot.frame), keypad: \(viewport.frame), adjustment: \(frame)"
             if frame != previousFrame {
                 previousFrame = frame
                 stableSince = Date()
             }
-            return adjustment.isHittable && viewport.frame.intersection(self.app.frame).contains(frame)
-                && Date().timeIntervalSince(stableSince) >= 0.5
+            guard viewport.frame.intersection(snapshot.frame).contains(frame),
+                  Date().timeIntervalSince(stableSince) >= 0.5 else { return false }
+            let hittable = adjustment.isHittable
+            lastSample += ", hittable: \(hittable)"
+            return hittable
         }
-        XCTAssertEqual(XCTWaiter.wait(for: [XCTNSPredicateExpectation(predicate: settled, object: adjustment)], timeout: 5), .completed)
+        XCTAssertEqual(XCTWaiter.wait(for: [XCTNSPredicateExpectation(predicate: settled, object: adjustment)], timeout: 5), .completed, lastSample)
+    }
+
+    private func findSnapshot(_ root: any XCUIElementSnapshot, identifier: String) -> (any XCUIElementSnapshot)? {
+        if root.identifier == identifier { return root }
+        for child in root.children {
+            if let found = findSnapshot(child, identifier: identifier) { return found }
+        }
+        return nil
     }
 
     private func assertPhoneAdvancePlacement(quickValues: Bool) {
