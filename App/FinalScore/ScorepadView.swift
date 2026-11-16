@@ -19,6 +19,7 @@ struct ScorepadView: View {
     @State private var showsQuickScores = false
     @Environment(\.verticalSizeClass) private var verticalSizeClass
     @ScaledMetric(relativeTo: .headline) private var teamColumnWidth: CGFloat = 88
+    @ScaledMetric(relativeTo: .title3) private var roundAndAddRowHeight: CGFloat = 104
     @State private var roundsViewportHeight: CGFloat = 0
     @State private var horizontalOffset: CGFloat = 0
     @State private var columnDrag: ColumnDrag?
@@ -152,7 +153,13 @@ struct ScorepadView: View {
                             .task(id: ScrollTarget(selection: scorepad.selection, width: columnWidth, height: roundsViewportHeight)) {
                                 await Task.yield()
                                 guard !Task.isCancelled, let selection = scorepad.selection else { return }
-                                scroller.scrollTo(selection.round, anchor: .center)
+                                if selection.round == scorepad.match.rounds.last?.id,
+                                   !scorepad.match.isEnded,
+                                   roundsViewportHeight >= roundAndAddRowHeight {
+                                    scroller.scrollTo(Self.newRoundRowID, anchor: .bottom)
+                                } else {
+                                    scroller.scrollTo(selection.round, anchor: .center)
+                                }
                             }
                         }
                         Divider()
