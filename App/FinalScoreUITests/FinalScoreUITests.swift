@@ -15,13 +15,15 @@ final class FinalScoreUITests: XCTestCase {
         XCTAssertEqual(app.buttons["key.minusOne"].label, "Subtract 5")
         attachScreenshot(named: "Points step on the numeric keypad")
 
-        let digitWidth = app.buttons["key.1"].frame.width
         if UIDevice.current.userInterfaceIdiom == .pad {
             assertSimultaneousKeypads(stacked: false, lastQuickScore: 12)
         } else {
             app.buttons["key.mode"].tap()
+            waitForKeypadToSettle()
             XCTAssertFalse(app.buttons["key.1"].exists)
-            XCTAssertGreaterThanOrEqual(app.buttons["quickScore.0"].frame.width, digitWidth - 1)
+            XCTAssertEqual(app.buttons["quickScore.3"].frame.minY, app.buttons["quickScore.0"].frame.minY, accuracy: 1)
+            XCTAssertGreaterThanOrEqual(app.buttons["quickScore.0"].frame.width, 44)
+            XCTAssertGreaterThanOrEqual(app.buttons["quickScore.0"].frame.height, 44)
         }
         app.buttons["quickScore.0"].tap()
         press("plusOne", "minusOne")
@@ -29,6 +31,10 @@ final class FinalScoreUITests: XCTestCase {
         attachScreenshot(named: "Large quick scores with step adjustments")
         let lastQuickScore = app.buttons["quickScore.12"]
         let quickGrid = app.scrollViews["quickScoreGrid"]
+        if UIDevice.current.userInterfaceIdiom == .phone {
+            XCTAssertTrue(lastQuickScore.isHittable)
+            XCTAssertTrue(quickGrid.frame.insetBy(dx: -1, dy: -1).contains(lastQuickScore.frame))
+        }
         for _ in 0..<4 where !lastQuickScore.isHittable { quickGrid.swipeUp() }
         XCTAssertTrue(lastQuickScore.isHittable)
         XCTAssertTrue(app.buttons["key.plusOne"].isHittable)

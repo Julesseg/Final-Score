@@ -109,6 +109,7 @@ struct KeypadView<Target: KeypadTarget>: View {
     @ScaledMetric(relativeTo: .title2) private var adjustmentWidth: CGFloat = 72
     @ScaledMetric(relativeTo: .headline) private var quickScoreWidth: CGFloat = 44
     @ScaledMetric(relativeTo: .title2) private var minimumQuickScoreWidth: CGFloat = 64
+    @ScaledMetric(relativeTo: .title2) private var minimumPhoneQuickScoreWidth: CGFloat = 44
     @State private var keypadWidth: CGFloat = 0
     @State private var quickGridWidth: CGFloat = 0
     @State private var headerHeight: CGFloat = 44
@@ -135,8 +136,13 @@ struct KeypadView<Target: KeypadTarget>: View {
         layout != .switchable && !quickScores.isEmpty
     }
 
+    private var gridKeyMinimumWidth: CGFloat {
+        max(44, showsBothKeypads ? minimumQuickScoreWidth : minimumPhoneQuickScoreWidth)
+    }
+
     private var quickScoreColumns: Int {
-        showsBothKeypads ? max(1, Int((quickGridWidth + spacing) / (max(44, minimumQuickScoreWidth) + spacing))) : 3
+        let fitting = max(1, Int((quickGridWidth + spacing) / (gridKeyMinimumWidth + spacing)))
+        return showsBothKeypads ? fitting : min(4, fitting)
     }
 
     private var quickScoreRows: Int {
@@ -297,8 +303,8 @@ struct KeypadView<Target: KeypadTarget>: View {
         let rows = showsBothKeypads ? quickScoreRows : min(4, quickScoreRows)
         let height = max(keyHeight, (quickGridHeight - CGFloat(rows - 1) * spacing) / CGFloat(rows))
         let columns = showsBothKeypads
-            ? [GridItem(.adaptive(minimum: max(44, minimumQuickScoreWidth)), spacing: spacing)]
-            : Array(repeating: GridItem(.flexible(), spacing: spacing), count: 3)
+            ? [GridItem(.adaptive(minimum: gridKeyMinimumWidth), spacing: spacing)]
+            : Array(repeating: GridItem(.flexible(minimum: gridKeyMinimumWidth), spacing: spacing), count: quickScoreColumns)
         return ScrollView(.vertical) {
             LazyVGrid(columns: columns, spacing: spacing) {
                 ForEach(Array(quickScores.enumerated()), id: \.offset) { index, points in
