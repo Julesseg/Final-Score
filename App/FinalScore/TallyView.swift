@@ -28,8 +28,8 @@ struct TallyView: View {
                 MatchBanner(match: pad.match, onEnd: { isConfirmingEnd = true }, onRematch: onRematch)
                 board
             }
-        } keypad: { isCompact, layout in
-            keypad(isCompact: isCompact, layout: layout)
+        } keypad: { isCompact, layout, availableHeight in
+            keypad(isCompact: isCompact, layout: layout, availableHeight: availableHeight)
         }
         .tint(pad.match.game.accent.color)
         .celebrating(pad.match)
@@ -249,14 +249,15 @@ struct TallyView: View {
 
     // MARK: Keypad
 
-    private func keypad(isCompact: Bool, layout: KeypadLayout) -> some View {
+    private func keypad(isCompact: Bool, layout: KeypadLayout, availableHeight: CGFloat?) -> some View {
         KeypadView(
             target: $pad,
             showsQuickScores: $showsQuickScores,
             title: keypadTitle,
             nextTitle: "Done",
             isCompact: isCompact,
-            layout: layout
+            layout: layout,
+            availableHeight: availableHeight
         ) { pad.deselect() }
     }
 

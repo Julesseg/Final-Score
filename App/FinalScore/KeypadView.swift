@@ -30,8 +30,9 @@ enum KeypadLayout {
 struct KeypadDock<Content: View, Keypad: View>: View {
     let isShowingKeypad: Bool
     @ViewBuilder let content: Content
-    @ViewBuilder let keypad: (Bool, KeypadLayout) -> Keypad
+    @ViewBuilder let keypad: (Bool, KeypadLayout, CGFloat?) -> Keypad
     @ScaledMetric(relativeTo: .body) private var minimumContentHeight: CGFloat = 240
+    @ScaledMetric(relativeTo: .title2) private var minimumSideBySideWidth: CGFloat = 600
     @State private var keypadHeight: CGFloat = 0
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
@@ -40,14 +41,15 @@ struct KeypadDock<Content: View, Keypad: View>: View {
             let usesSidebar = proxy.size.width >= 520 && proxy.size.width > proxy.size.height
             let compactKeys = proxy.size.height < (usesSidebar ? 500 : 720)
             let layout: KeypadLayout = UIDevice.current.userInterfaceIdiom == .pad
-                ? (usesSidebar || proxy.size.width < 600 ? .stacked : .sideBySide)
+                ? (usesSidebar || proxy.size.width < minimumSideBySideWidth ? .stacked : .sideBySide)
                 : .switchable
+            let maximumDockHeight = max(44, proxy.size.height - min(minimumContentHeight, proxy.size.height * 0.6))
             if usesSidebar {
                 HStack(spacing: 0) {
                     content
                     if isShowingKeypad {
                         ScrollView(.vertical) {
-                            keypad(compactKeys, layout)
+                            keypad(compactKeys, layout, layout == .switchable ? nil : proxy.size.height)
                                 .clipShape(RoundedRectangle(cornerRadius: 32, style: .continuous))
                                 .padding(.horizontal, 12)
                                 .frame(minHeight: proxy.size.height)
@@ -65,7 +67,7 @@ struct KeypadDock<Content: View, Keypad: View>: View {
                         VStack(spacing: 0) {
                             Divider()
                             ScrollView(.vertical) {
-                                keypad(compactKeys, layout)
+                                keypad(compactKeys, layout, layout == .switchable ? nil : maximumDockHeight)
                                     .frame(maxWidth: .infinity)
                                     .onGeometryChange(for: CGFloat.self) { $0.size.height } action: {
                                         keypadHeight = $0
@@ -75,7 +77,7 @@ struct KeypadDock<Content: View, Keypad: View>: View {
                             .scrollBounceBehavior(.basedOnSize)
                             .frame(height: min(
                                 keypadHeight > 0 ? keypadHeight : proxy.size.height / 2,
-                                max(44, proxy.size.height - min(minimumContentHeight, proxy.size.height * 0.6))
+                                maximumDockHeight
                             ))
                         }
                         .transition(transition(from: .bottom))
@@ -102,10 +104,15 @@ struct KeypadView<Target: KeypadTarget>: View {
     let nextTitle: String
     var isCompact = false
     var layout: KeypadLayout = .switchable
+    var availableHeight: CGFloat? = nil
     let next: () -> Void
     @ScaledMetric(relativeTo: .title2) private var adjustmentWidth: CGFloat = 72
     @ScaledMetric(relativeTo: .headline) private var quickScoreWidth: CGFloat = 44
+    @ScaledMetric(relativeTo: .title2) private var minimumQuickScoreWidth: CGFloat = 64
     @State private var keypadWidth: CGFloat = 0
+    @State private var quickGridWidth: CGFloat = 0
+    @State private var headerHeight: CGFloat = 44
+    @State private var nextHeight: CGFloat = 44
 
     private var keyHeight: CGFloat {
         isCompact ? 44 : 52
@@ -128,6 +135,28 @@ struct KeypadView<Target: KeypadTarget>: View {
         layout != .switchable && !quickScores.isEmpty
     }
 
+    private var quickScoreColumns: Int {
+        showsBothKeypads ? max(1, Int((quickGridWidth + spacing) / (max(44, minimumQuickScoreWidth) + spacing))) : 3
+    }
+
+    private var quickScoreRows: Int {
+        max(1, (quickScores.count + quickScoreColumns - 1) / quickScoreColumns)
+    }
+
+    private var inputHeight: CGFloat {
+        guard showsBothKeypads else { return digitsHeight }
+        let available = max(digitsHeight, (availableHeight ?? 0) - headerHeight - nextHeight - 2 * spacing - 24)
+        if layout == .stacked {
+            return max(digitsHeight + spacing + keyHeight, available)
+        }
+        let needed = CGFloat(quickScoreRows) * keyHeight + CGFloat(quickScoreRows - 1) * spacing
+        return max(digitsHeight, min(needed, available))
+    }
+
+    private var quickGridHeight: CGFloat {
+        showsBothKeypads && layout == .stacked ? inputHeight - digitsHeight - spacing : inputHeight
+    }
+
     var body: some View {
         VStack(spacing: spacing) {
             HStack {
@@ -147,38 +176,36 @@ struct KeypadView<Target: KeypadTarget>: View {
                     .labelStyle(.iconOnly)
                     .accessibilityIdentifier("hideKeypadButton")
             }
+            .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { headerHeight = $0 }
             if !quickScores.isEmpty && !isCompact && !showsQuickScores && !showsBothKeypads {
                 quickScoreRow
             }
-            HStack(spacing: spacing) {
-                if showsBothKeypads {
-                    let panels = layout == .stacked
-                        ? AnyLayout(VStackLayout(spacing: spacing))
-                        : AnyLayout(HStackLayout(spacing: spacing))
-                    panels {
+            if showsBothKeypads {
+                let panels = layout == .stacked
+                    ? AnyLayout(VStackLayout(spacing: spacing))
+                    : AnyLayout(HStackLayout(alignment: .top, spacing: spacing))
+                panels {
+                    HStack(spacing: spacing) {
                         digits
-                            .frame(maxWidth: .infinity)
-                            .frame(height: digitsHeight)
-                        quickScoreGrid
-                            .frame(height: digitsHeight)
+                            .frame(width: layout == .sideBySide ? 3 * max(44, adjustmentWidth) + 2 * spacing : nil)
+                        adjustmentKeys
                     }
-                } else if showsQuickScores && !quickScores.isEmpty {
+                    .frame(height: digitsHeight)
                     quickScoreGrid
-                } else {
-                    digits
+                        .frame(height: quickGridHeight)
                 }
-                VStack(spacing: spacing) {
-                    key(Text("+\(step)"), identifier: "key.plusOne", fillsHeight: true) { target.adjust(by: step) }
-                        .accessibilityLabel("Add \(step)")
-                    key(Text("−\(step)"), identifier: "key.minusOne", fillsHeight: true) { target.adjust(by: -step) }
-                        .accessibilityLabel("Subtract \(step)")
-                    if !quickScores.isEmpty && isCompact && !showsBothKeypads {
-                        modeButton
+                .frame(height: inputHeight)
+            } else {
+                HStack(spacing: spacing) {
+                    if showsQuickScores && !quickScores.isEmpty {
+                        quickScoreGrid
+                    } else {
+                        digits
                     }
+                    adjustmentKeys
                 }
-                .frame(width: adjustColumnWidth)
+                .frame(height: digitsHeight)
             }
-            .frame(height: showsBothKeypads && layout == .stacked ? 2 * digitsHeight + spacing : digitsHeight)
             if isCompact && !quickScores.isEmpty && !showsQuickScores && !showsBothKeypads {
                 ViewThatFits(in: .horizontal) {
                     HStack(spacing: spacing) {
@@ -200,6 +227,7 @@ struct KeypadView<Target: KeypadTarget>: View {
                 .frame(maxWidth: .infinity)
             } else {
                 nextButton
+                    .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { nextHeight = $0 }
             }
         }
         .padding(12)
@@ -217,6 +245,19 @@ struct KeypadView<Target: KeypadTarget>: View {
         .labelStyle(.iconOnly)
         .frame(minWidth: 44, minHeight: 44)
         .accessibilityIdentifier("key.mode")
+    }
+
+    private var adjustmentKeys: some View {
+        VStack(spacing: spacing) {
+            key(Text("+\(step)"), identifier: "key.plusOne", fillsHeight: true) { target.adjust(by: step) }
+                .accessibilityLabel("Add \(step)")
+            key(Text("−\(step)"), identifier: "key.minusOne", fillsHeight: true) { target.adjust(by: -step) }
+                .accessibilityLabel("Subtract \(step)")
+            if !quickScores.isEmpty && isCompact && !showsBothKeypads {
+                modeButton
+            }
+        }
+        .frame(width: adjustColumnWidth)
     }
 
     private var step: Int { target.match.game.adjustmentStep }
@@ -245,10 +286,13 @@ struct KeypadView<Target: KeypadTarget>: View {
     }
 
     private var quickScoreGrid: some View {
-        let rows = max(1, min(4, (quickScores.count + 2) / 3))
-        let height = (digitsHeight - CGFloat(rows - 1) * spacing) / CGFloat(rows)
+        let rows = showsBothKeypads ? quickScoreRows : min(4, quickScoreRows)
+        let height = max(keyHeight, (quickGridHeight - CGFloat(rows - 1) * spacing) / CGFloat(rows))
+        let columns = showsBothKeypads
+            ? [GridItem(.adaptive(minimum: max(44, minimumQuickScoreWidth)), spacing: spacing)]
+            : Array(repeating: GridItem(.flexible(), spacing: spacing), count: 3)
         return ScrollView(.vertical) {
-            LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: spacing), count: 3), spacing: spacing) {
+            LazyVGrid(columns: columns, spacing: spacing) {
                 ForEach(Array(quickScores.enumerated()), id: \.offset) { index, points in
                     Button { target.enterQuickScore(points) } label: {
                         Text("\(points)")
@@ -265,6 +309,7 @@ struct KeypadView<Target: KeypadTarget>: View {
         }
         .scrollBounceBehavior(.basedOnSize)
         .frame(maxWidth: .infinity)
+        .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { quickGridWidth = $0 }
         .accessibilityIdentifier("quickScoreGrid")
     }
 
