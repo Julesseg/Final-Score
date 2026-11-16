@@ -125,14 +125,8 @@ struct KeypadView<Target: KeypadTarget>: View {
                 Text(target.keypadText)
                     .font(.title2.bold().monospacedDigit())
                     .accessibilityIdentifier("keypadDisplay")
-                if !quickScores.isEmpty {
-                    Button(showsQuickScores ? "Show Keypad" : "Show Quick Scores",
-                           systemImage: showsQuickScores ? "keyboard" : "square.grid.3x3") {
-                        showsQuickScores.toggle()
-                    }
-                    .labelStyle(.iconOnly)
-                    .frame(minWidth: 44, minHeight: 44)
-                    .accessibilityIdentifier("key.mode")
+                if !quickScores.isEmpty && !isCompact {
+                    modeButton
                 }
                 Button("Hide Keypad", systemImage: "keyboard.chevron.compact.down") { target.deselect() }
                     .labelStyle(.iconOnly)
@@ -152,6 +146,9 @@ struct KeypadView<Target: KeypadTarget>: View {
                         .accessibilityLabel("Add \(step)")
                     key(Text("−\(step)"), identifier: "key.minusOne", fillsHeight: true) { target.adjust(by: -step) }
                         .accessibilityLabel("Subtract \(step)")
+                    if !quickScores.isEmpty && isCompact {
+                        modeButton
+                    }
                 }
                 .frame(width: adjustColumnWidth)
             }
@@ -184,6 +181,16 @@ struct KeypadView<Target: KeypadTarget>: View {
             keypadWidth = $0
         }
         .background(.bar)
+    }
+
+    private var modeButton: some View {
+        Button(showsQuickScores ? "Show Keypad" : "Show Quick Scores",
+               systemImage: showsQuickScores ? "keyboard" : "square.grid.3x3") {
+            showsQuickScores.toggle()
+        }
+        .labelStyle(.iconOnly)
+        .frame(minWidth: 44, minHeight: 44)
+        .accessibilityIdentifier("key.mode")
     }
 
     private var step: Int { target.match.game.adjustmentStep }
