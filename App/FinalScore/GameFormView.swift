@@ -44,6 +44,7 @@ struct GameFormView: View {
                 endSection
                 quickScoresSection
             }
+            .accessibilityIdentifier("gameForm")
             .navigationTitle(editing == nil ? "New Game" : "Edit Game")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {

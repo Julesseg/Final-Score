@@ -41,8 +41,8 @@ struct ScorepadView: View {
                 MatchBanner(match: scorepad.match, onEnd: { isConfirmingEnd = true }, onRematch: onRematch)
                 grid
             }
-        } keypad: { isCompact in
-            keypad(isCompact: isCompact)
+        } keypad: { isCompact, layout, availableHeight in
+            keypad(isCompact: isCompact, layout: layout, availableHeight: availableHeight)
         }
         .tint(game.accent.color)
         .celebrating(scorepad.match)
@@ -90,8 +90,8 @@ struct ScorepadView: View {
 
     // MARK: Keypad
 
-    private func keypad(isCompact: Bool) -> some View {
-        KeypadView(target: $scorepad, showsQuickScores: $showsQuickScores, title: keypadTitle, nextTitle: nextTitle, isCompact: isCompact) { scorepad.next() }
+    private func keypad(isCompact: Bool, layout: KeypadLayout, availableHeight: CGFloat?) -> some View {
+        KeypadView(target: $scorepad, showsQuickScores: $showsQuickScores, title: keypadTitle, nextTitle: nextTitle, isCompact: isCompact, layout: layout, availableHeight: availableHeight) { scorepad.next() }
     }
 
     /// "Grace · Round 2"

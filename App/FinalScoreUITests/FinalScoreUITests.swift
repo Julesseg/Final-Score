@@ -109,28 +109,43 @@ final class FinalScoreUITests: XCTestCase {
         XCTAssertEqual(app.buttons["key.minusOne"].label, "Subtract 5")
         attachScreenshot(named: "Points step on the numeric keypad")
 
-        let digitWidth = app.buttons["key.1"].frame.width
-        app.buttons["key.mode"].tap()
-        XCTAssertFalse(app.buttons["key.1"].exists)
-        XCTAssertGreaterThanOrEqual(app.buttons["quickScore.0"].frame.width, digitWidth - 1)
+        if UIDevice.current.userInterfaceIdiom == .pad {
+            assertSimultaneousKeypads(stacked: false, lastQuickScore: 12)
+        } else {
+            assertPhoneAdvancePlacement(quickValues: false)
+            app.buttons["key.mode"].tap()
+            assertPhoneAdvancePlacement(quickValues: true)
+            XCTAssertFalse(app.buttons["key.1"].exists)
+            XCTAssertEqual(app.buttons["quickScore.3"].frame.minY, app.buttons["quickScore.0"].frame.minY, accuracy: 1)
+            XCTAssertGreaterThanOrEqual(app.buttons["quickScore.0"].frame.width, 44)
+            XCTAssertGreaterThanOrEqual(app.buttons["quickScore.0"].frame.height, 44)
+        }
         app.buttons["quickScore.0"].tap()
         press("plusOne", "minusOne")
         XCTAssertEqual(total(0), "25")
         attachScreenshot(named: "Large quick scores with step adjustments")
         let lastQuickScore = app.buttons["quickScore.12"]
         let quickGrid = app.scrollViews["quickScoreGrid"]
+        if UIDevice.current.userInterfaceIdiom == .phone {
+            XCTAssertTrue(lastQuickScore.isHittable)
+            XCTAssertTrue(quickGrid.frame.insetBy(dx: -1, dy: -1).contains(lastQuickScore.frame))
+        }
         for _ in 0..<4 where !lastQuickScore.isHittable { quickGrid.swipeUp() }
         XCTAssertTrue(lastQuickScore.isHittable)
         XCTAssertTrue(app.buttons["key.plusOne"].isHittable)
         XCTAssertTrue(app.buttons["key.minusOne"].isHittable)
         lastQuickScore.tap()
         XCTAssertEqual(total(0), "375")
-        attachScreenshot(named: "Many quick scores scroll beside fixed step buttons")
+        attachScreenshot(named: "All configured quick scores remain reachable")
 
-        app.buttons["key.mode"].tap()
+        if app.buttons["key.mode"].exists { app.buttons["key.mode"].tap() }
         press("3", "plusOne", "next")
         XCTAssertEqual(total(0), "8", "Custom entry ignores the step")
-        app.buttons["key.mode"].tap()
+        if app.buttons["key.mode"].exists {
+            app.buttons["key.mode"].tap()
+        } else {
+            for _ in 0..<4 where !app.buttons["quickScore.1"].isHittable { quickGrid.swipeDown() }
+        }
         app.buttons["quickScore.1"].tap()
         app.buttons["leaderboardButton"].tap()
         XCTAssertTrue(element("leaderboardRow.0").waitForExistence(timeout: 5))
@@ -147,7 +162,27 @@ final class FinalScoreUITests: XCTestCase {
         hideKeypad()
         app.buttons["score.1.1"].tap()
         XCTAssertTrue(app.buttons["quickScore.1"].waitForExistence(timeout: 5))
-        XCTAssertFalse(app.buttons["key.1"].exists, "The chosen mode survives hiding the keypad")
+        if UIDevice.current.userInterfaceIdiom == .pad {
+            assertSimultaneousKeypads(stacked: false, lastQuickScore: 12)
+            XCUIDevice.shared.orientation = .landscapeLeft
+            assertSimultaneousKeypads(stacked: true, lastQuickScore: 12)
+            attachScreenshot(named: "Both iPad keypads stacked in landscape")
+            app.buttons["quickScore.0"].tap()
+            press("7", "minusOne")
+            XCTAssertEqual(total(1), "2")
+            XCUIDevice.shared.orientation = .portrait
+            assertSimultaneousKeypads(stacked: false, lastQuickScore: 12)
+            XCTAssertEqual(element("keypadDisplay").label, "2")
+            attachScreenshot(named: "Both iPad keypads side by side after rotating back")
+            press("next")
+            XCTAssertEqual(app.buttons["key.next"].label, "New Round")
+            XCTAssertEqual(app.buttons["key.next"].frame.minX, app.buttons["key.1"].frame.minX, accuracy: 1)
+            XCTAssertEqual(app.buttons["key.next"].frame.maxX, app.buttons["key.plusOne"].frame.maxX, accuracy: 1)
+            press("next")
+            XCTAssertTrue(element("keypadTitle").label.contains("Round 2"))
+        } else {
+            XCTAssertFalse(app.buttons["key.1"].exists, "The chosen mode survives hiding the keypad")
+        }
     }
 
     func testTallyQuickInputsAndLeaderboardInLandscape() {
@@ -155,10 +190,20 @@ final class FinalScoreUITests: XCTestCase {
         makeQuickInputGame(tally: true)
         pickPlayers(["Ada", "Grace", "Linus"])
         tapStart()
-        XCUIDevice.shared.orientation = .landscapeLeft
         app.buttons["total.0"].tap()
+        if UIDevice.current.userInterfaceIdiom == .pad {
+            assertSimultaneousKeypads(stacked: false)
+            attachScreenshot(named: "Both iPad tally keypads in portrait")
+        }
+        XCUIDevice.shared.orientation = .landscapeLeft
         waitForKeypadToSettle()
-        app.buttons["key.mode"].tap()
+        if UIDevice.current.userInterfaceIdiom == .pad {
+            assertSimultaneousKeypads(stacked: true)
+        } else {
+            assertPhoneAdvancePlacement(quickValues: false)
+            app.buttons["key.mode"].tap()
+            assertPhoneAdvancePlacement(quickValues: true)
+        }
         app.buttons["quickScore.1"].tap()
         press("plusOne")
         XCTAssertEqual(total(0), "55")
@@ -175,21 +220,110 @@ final class FinalScoreUITests: XCTestCase {
     }
 
     private func waitForKeypadToSettle() {
-        let mode = app.buttons["key.mode"]
-        let viewport = element("keypadViewport")
+        let adjustment = app.buttons["key.plusOne"]
         var previousFrame = CGRect.null
         var stableSince = Date()
+        var lastSample = "No keypad snapshot"
         let settled = NSPredicate { _, _ in
-            guard mode.exists, viewport.exists else { return false }
-            let frame = mode.frame
+            guard let snapshot = try? self.app.snapshot(),
+                  let viewport = self.findSnapshot(snapshot, identifier: "keypadViewport"),
+                  let button = self.findSnapshot(snapshot, identifier: "key.plusOne") else {
+                lastSample = "Snapshot missing keypad controls"
+                return false
+            }
+            let frame = button.frame
+            lastSample = "Window: \(snapshot.frame), keypad: \(viewport.frame), adjustment: \(frame)"
             if frame != previousFrame {
                 previousFrame = frame
                 stableSince = Date()
             }
-            return mode.isHittable && viewport.frame.intersection(self.app.frame).contains(frame)
-                && Date().timeIntervalSince(stableSince) >= 0.5
+            guard viewport.frame.intersection(snapshot.frame).contains(frame),
+                  Date().timeIntervalSince(stableSince) >= 0.5 else { return false }
+            let hittable = adjustment.isHittable
+            lastSample += ", hittable: \(hittable)"
+            return hittable
         }
-        XCTAssertEqual(XCTWaiter.wait(for: [XCTNSPredicateExpectation(predicate: settled, object: mode)], timeout: 5), .completed)
+        XCTAssertEqual(XCTWaiter.wait(for: [XCTNSPredicateExpectation(predicate: settled, object: adjustment)], timeout: 5), .completed, lastSample)
+    }
+
+    private func findSnapshot(_ root: any XCUIElementSnapshot, identifier: String) -> (any XCUIElementSnapshot)? {
+        if root.identifier == identifier { return root }
+        for child in root.children {
+            if let found = findSnapshot(child, identifier: identifier) { return found }
+        }
+        return nil
+    }
+
+    private func assertPhoneAdvancePlacement(quickValues: Bool) {
+        waitForKeypadToSettle()
+        let next = app.buttons["key.next"]
+        let plus = app.buttons["key.plusOne"]
+        let minus = app.buttons["key.minusOne"]
+        let mode = app.buttons["key.mode"]
+        let placed = NSPredicate { _, _ in
+            guard next.exists, plus.exists, minus.exists, mode.exists else { return false }
+            guard [plus, minus, mode].allSatisfy({
+                abs($0.frame.minX - next.frame.minX) <= 1 && abs($0.frame.width - next.frame.width) <= 1
+            }), next.frame.minY >= mode.frame.maxY,
+               next.frame.width >= 44, next.frame.height >= 44 else { return false }
+            if quickValues {
+                let grid = self.app.scrollViews["quickScoreGrid"]
+                return grid.exists && abs(grid.frame.minY - plus.frame.minY) <= 1
+                    && abs(grid.frame.maxY - next.frame.maxY) <= 1
+            }
+            return abs(self.app.buttons["quickScore.0"].frame.minY - next.frame.minY) <= 1
+        }
+        XCTAssertEqual(XCTWaiter.wait(for: [XCTNSPredicateExpectation(predicate: placed, object: next)], timeout: 5), .completed)
+    }
+
+    private func assertSimultaneousKeypads(stacked: Bool, lastQuickScore: Int = 3) {
+        waitForKeypadToSettle()
+        XCTAssertFalse(app.buttons["key.mode"].exists)
+        assertAllKeypadKeysAreVisible()
+        let digit = app.buttons["key.1"]
+        let quickScore = app.buttons["quickScore.0"]
+        let quickGrid = app.scrollViews["quickScoreGrid"]
+        let next = app.buttons["key.next"]
+        let adjustment = app.buttons["key.plusOne"]
+        let delete = app.buttons["key.delete"]
+        let placed = NSPredicate { _, _ in
+            guard digit.exists, quickGrid.exists, next.exists, adjustment.exists, delete.exists else { return false }
+            guard next.frame.minY >= delete.frame.maxY,
+                  abs(next.frame.minX - digit.frame.minX) <= 1,
+                  abs(next.frame.maxX - adjustment.frame.maxX) <= 1 else { return false }
+            return stacked
+                ? quickGrid.frame.maxY <= digit.frame.minY
+                : quickGrid.frame.maxX <= digit.frame.minX
+                    && abs(quickGrid.frame.minY - digit.frame.minY) <= 1
+                    && quickGrid.frame.maxY >= next.frame.maxY - 1
+        }
+        XCTAssertEqual(XCTWaiter.wait(for: [XCTNSPredicateExpectation(predicate: placed, object: quickScore)], timeout: 5), .completed)
+        XCTAssertTrue(quickScore.isHittable)
+        XCTAssertGreaterThanOrEqual(quickScore.frame.width, 64)
+        XCTAssertGreaterThanOrEqual(quickScore.frame.height, 44)
+        let last = app.buttons["quickScore.\(lastQuickScore)"]
+        let viewport = element("keypadViewport")
+        let fits = NSPredicate { _, _ in
+            guard last.exists, viewport.exists else { return false }
+            return viewport.frame.intersection(self.app.frame).insetBy(dx: -1, dy: -1).contains(last.frame)
+                && last.isHittable && last.frame.width >= 64 && last.frame.height >= 44
+        }
+        XCTAssertEqual(XCTWaiter.wait(for: [XCTNSPredicateExpectation(predicate: fits, object: last)], timeout: 5), .completed)
+        if stacked {
+            var lastFrames = "No keypad content area"
+            let fillsHeight = NSPredicate { _, _ in
+                guard let snapshot = try? self.app.snapshot(),
+                      let area = self.findSnapshot(snapshot, identifier: "keypadContentArea"),
+                      let next = self.findSnapshot(snapshot, identifier: "key.next"),
+                      let display = self.findSnapshot(snapshot, identifier: "keypadDisplay") else { return false }
+                lastFrames = "Area: \(area.frame), display: \(display.frame), next: \(next.frame)"
+                return abs(next.frame.maxY - area.frame.maxY + 12) <= 2
+                    && abs(display.frame.minY - area.frame.minY - 12) <= 2
+            }
+            XCTAssertEqual(XCTWaiter.wait(for: [XCTNSPredicateExpectation(predicate: fillsHeight, object: viewport)], timeout: 5), .completed, lastFrames)
+        } else if lastQuickScore >= 12 {
+            XCTAssertEqual(app.buttons["quickScore.3"].frame.minY, quickScore.frame.minY, accuracy: 1)
+        }
     }
 
     private func makeQuickInputGame(tally: Bool = false) {
@@ -212,21 +346,38 @@ final class FinalScoreUITests: XCTestCase {
         step.typeKey(.rightArrow, modifierFlags: [])
         step.typeText(XCUIKeyboardKey.delete.rawValue + "5")
         XCTAssertEqual(step.value as? String, "5")
-        app.buttons["dismissGameKeyboardButton"].tap()
-        XCTAssertTrue(app.keyboards.firstMatch.waitForNonExistence(timeout: 5))
+        if UIDevice.current.userInterfaceIdiom == .pad {
+            // The native number-entry popover can cover the toolbar's Done button.
+            app.navigationBars["New Game"].coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5)).tap()
+            if app.buttons["dismissGameKeyboardButton"].exists { tapGameKeyboardDone() }
+        } else {
+            tapGameKeyboardDone()
+        }
+        let keyboardDismissed = app.keyboards.firstMatch.waitForNonExistence(timeout: 5)
+        if !keyboardDismissed { attachScreenshot(named: "Game form after Done") }
+        XCTAssertTrue(keyboardDismissed)
         attachScreenshot(named: "Optional points step in the Game form")
         if !tally {
             let quickScore = app.textFields["newQuickScore"]
             for points in stride(from: 175, through: 375, by: 25) {
                 dragFormToReveal(quickScore).tap()
                 quickScore.typeText("\(points)")
-                app.buttons["dismissGameKeyboardButton"].tap()
+                tapGameKeyboardDone()
             }
         }
         app.buttons["saveGameButton"].tap()
         let game = app.buttons["game.Tarot copy"]
         scrollListToReveal(game)
         game.tap()
+    }
+
+    private func tapGameKeyboardDone() {
+        let done = app.buttons["dismissGameKeyboardButton"]
+        let ready = NSPredicate { _, _ in done.exists && done.isHittable }
+        let result = XCTWaiter.wait(for: [XCTNSPredicateExpectation(predicate: ready, object: done)], timeout: 5)
+        if result != .completed { attachScreenshot(named: "Game toolbar Done not hittable") }
+        XCTAssertEqual(result, .completed, "Game form Done must be hittable")
+        done.tap()
     }
 
     func testTarotKeepsTheSelectedScoreVisibleWithTheKeypadOpen() {
@@ -269,18 +420,28 @@ final class FinalScoreUITests: XCTestCase {
     }
 
     private func assertAllKeypadKeysAreVisible() {
-        let keypad = element("keypadViewport")
         let identifiers = (0...9).map { "key.\($0)" }
             + ["key.sign", "key.delete", "key.plusOne", "key.minusOne", "key.next"]
-        for identifier in identifiers {
-            let button = app.buttons[identifier]
-            let visible = NSPredicate { _, _ in
-                guard button.exists, keypad.exists else { return false }
-                return keypad.frame.intersection(self.app.frame).insetBy(dx: -1, dy: -1).contains(button.frame)
-                    && button.isHittable && button.frame.width >= 44 && button.frame.height >= 44
+        var lastSample = "No keypad snapshot"
+        let visible = NSPredicate { _, _ in
+            guard let snapshot = try? self.app.snapshot(),
+                  let keypad = self.findSnapshot(snapshot, identifier: "keypadViewport") else {
+                lastSample = "Snapshot missing keypad viewport"
+                return false
             }
-            XCTAssertEqual(XCTWaiter.wait(for: [XCTNSPredicateExpectation(predicate: visible, object: button)], timeout: 5), .completed, identifier)
+            let viewport = keypad.frame.intersection(snapshot.frame).insetBy(dx: -1, dy: -1)
+            for identifier in identifiers {
+                guard let button = self.findSnapshot(snapshot, identifier: identifier) else {
+                    lastSample = "Snapshot missing \(identifier)"
+                    return false
+                }
+                lastSample = "\(identifier): \(button.frame), viewport: \(viewport)"
+                guard viewport.contains(button.frame), button.frame.width >= 44,
+                      button.frame.height >= 44, self.app.buttons[identifier].isHittable else { return false }
+            }
+            return true
         }
+        XCTAssertEqual(XCTWaiter.wait(for: [XCTNSPredicateExpectation(predicate: visible, object: app)], timeout: 5), .completed, lastSample)
     }
 
     private func assertKeypadPlacement(usesSidebar: Bool) {
@@ -298,9 +459,11 @@ final class FinalScoreUITests: XCTestCase {
         let keypad = element("keypadViewport")
         let firstKey = app.buttons["key.1"]
         let adjustmentKey = app.buttons["key.plusOne"]
+        let hasBothKeypads = UIDevice.current.userInterfaceIdiom == .pad && app.scrollViews["quickScoreGrid"].exists
+        let leadingKeys = hasBothKeypads ? app.scrollViews["quickScoreGrid"] : firstKey
         let fillsWidth = NSPredicate { _, _ in
-            guard keypad.exists, firstKey.exists, adjustmentKey.exists else { return false }
-            return abs(firstKey.frame.minX - keypad.frame.minX - 12) <= 1
+            guard keypad.exists, leadingKeys.exists, adjustmentKey.exists else { return false }
+            return abs(leadingKeys.frame.minX - keypad.frame.minX - 12) <= 1
                 && abs(keypad.frame.maxX - adjustmentKey.frame.maxX - 12) <= 1
         }
         XCTAssertEqual(XCTWaiter.wait(for: [XCTNSPredicateExpectation(predicate: fillsWidth, object: keypad)], timeout: 5), .completed)
@@ -1054,8 +1217,9 @@ final class FinalScoreUITests: XCTestCase {
     /// grid of symbols or a control and leaves the form where it is.
     @discardableResult
     private func dragFormToReveal(_ element: XCUIElement) -> XCUIElement {
+        let form = self.element("gameForm")
+        XCTAssertTrue(form.waitForExistence(timeout: 5))
         for _ in 0..<8 where !(element.exists && element.isHittable) {
-            let form = app.collectionViews.allElementsBoundByIndex.last(where: { $0.isHittable }) ?? app
             let keyboard = app.keyboards.firstMatch
             let startY = keyboard.exists ? min(0.75, (keyboard.frame.minY - form.frame.minY - 30) / form.frame.height) : 0.75
             form.coordinate(withNormalizedOffset: CGVector(dx: 0.97, dy: startY))
