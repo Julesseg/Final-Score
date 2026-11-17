@@ -326,18 +326,28 @@ final class FinalScoreUITests: XCTestCase {
     }
 
     private func assertAllKeypadKeysAreVisible() {
-        let keypad = element("keypadViewport")
         let identifiers = (0...9).map { "key.\($0)" }
             + ["key.sign", "key.delete", "key.plusOne", "key.minusOne", "key.next"]
-        for identifier in identifiers {
-            let button = app.buttons[identifier]
-            let visible = NSPredicate { _, _ in
-                guard button.exists, keypad.exists else { return false }
-                return keypad.frame.intersection(self.app.frame).insetBy(dx: -1, dy: -1).contains(button.frame)
-                    && button.isHittable && button.frame.width >= 44 && button.frame.height >= 44
+        var lastSample = "No keypad snapshot"
+        let visible = NSPredicate { _, _ in
+            guard let snapshot = try? self.app.snapshot(),
+                  let keypad = self.findSnapshot(snapshot, identifier: "keypadViewport") else {
+                lastSample = "Snapshot missing keypad viewport"
+                return false
             }
-            XCTAssertEqual(XCTWaiter.wait(for: [XCTNSPredicateExpectation(predicate: visible, object: button)], timeout: 5), .completed, identifier)
+            let viewport = keypad.frame.intersection(snapshot.frame).insetBy(dx: -1, dy: -1)
+            for identifier in identifiers {
+                guard let button = self.findSnapshot(snapshot, identifier: identifier) else {
+                    lastSample = "Snapshot missing \(identifier)"
+                    return false
+                }
+                lastSample = "\(identifier): \(button.frame), viewport: \(viewport)"
+                guard viewport.contains(button.frame), button.frame.width >= 44,
+                      button.frame.height >= 44, self.app.buttons[identifier].isHittable else { return false }
+            }
+            return true
         }
+        XCTAssertEqual(XCTWaiter.wait(for: [XCTNSPredicateExpectation(predicate: visible, object: app)], timeout: 5), .completed, lastSample)
     }
 
     private func assertKeypadPlacement(usesSidebar: Bool) {
